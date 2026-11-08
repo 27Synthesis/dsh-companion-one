@@ -23,17 +23,19 @@ PR 描述建议强调这句，市场上没人占这个位置：
 
 仓库 topic 已设置（`dsh-plugin` 在列），市场站点会自动扫描到。
 
-## 3. 截图（可选，但很加分）
+## 3. 截图
 
-面板在 **设置 › 陪伴**，建议拍三张：
+已放入五张真机截图（dsh-go，均裁掉状态栏）：
 
 | 文件 | 画面 |
 | --- | --- |
-| `docs/screenshots/overview.png` | 概览页：心情、压力、最近一句心声 |
-| `docs/screenshots/memory.png` | 记忆页：七层分组与搜索 |
-| `docs/screenshots/compression.png` | 压缩页：压力条、块列表、还原按钮 |
+| `docs/screenshots/overview.jpg` | 陪伴速览：心情、心声、压力、阀门、叙事 |
+| `docs/screenshots/persona.jpg` | 人格页：当前叙事 v4、四阀门、推演层 |
+| `docs/screenshots/memory.jpg` | 记忆页：只读扫描与合并其他插件记忆 |
+| `docs/screenshots/learning.jpg` | 学习页：语料库、文风包、B 站联网学习 |
+| `docs/screenshots/compression.jpg` | 压缩页：压力、可压缩范围、块列表 |
 
-拍完放进 `docs/screenshots/`，在 README 的「功能全景」前加一节 `## 📸 界面` 引用即可。
+以后换图时保持同名覆盖即可，README 会直接引用。
 
 ## 4. CI（可选）
 

@@ -3,7 +3,8 @@
 </div>
 
 <div align="center">
-  <img src="docs/cover.svg" alt="companion-one — 把对话，过成日子" width="100%" />
+  <img src="docs/cover.svg" alt="companion-one — 让对话，慢慢长出一个「我」" width="100%" />
+  <img src="docs/cover-memory.svg" alt="companion-one — 一个插件，一整套陪伴系统" width="100%" />
 </div>
 
 <div align="center">
@@ -40,7 +41,7 @@ DSH 的会话越聊越长，主模型的上下文却只有那么大：旧对话�
 | | 能力 | 一句话 |
 | :--: | --- | --- |
 | 🎭 | **可塑人格 · 五区模型** | 感知 / 情绪 / 执行 / 叙事 / 表达 五区并行；思维链三层固化；四阀门反向调节 |
-| 🤝 | **与别的记忆插件共存** | 只读合并 Mnemon / 项目文档 / 其它 SQLite 记忆；源数据不动，重复自动合并 |
+| 🤝 | **与别的记忆插件共存** | 不用卸载：旧记忆和性格完整接过来；只读、源数据不改、重复自动合并 |
 | 🐟 | **活人感** | B 站联网学真人评论、投喂语料、蒸馏文风包；专治 AI 腔与鱼八股 |
 | 🧠 | **七层长期记忆** | soul / user / project / fact / lesson / topic / rules，按人隔离，事实带有效期与键失效 |
 | 🗜️ | **内置压缩引擎** | 分层折叠、只收「确实更短」的摘要、稳定块引用、被折叠原文可检索可还原 |
@@ -89,9 +90,25 @@ DSH 的会话越聊越长，主模型的上下文却只有那么大：旧对话�
 
 > 落地在 `persona_reaction` / `persona_chain` / `persona_narrative` 三张表与四个阀门上：每轮最多微调一个阀门，注入 ≤150 token；`promote` 新增叙事版本，`rollback` 回滚，`freeze` 只读。它是否真的「诞生了我」，交给时间和对话验证——但方向是让模型对自己的认识可累积、可回看、可修正，而不是每轮重新演一遍。
 
+<div align="center">
+  <img src="docs/screenshots/persona.jpg" alt="人格页：当前叙事 v4、四个阀门、推演层与版本历史" width="280" />
+  <br/>
+  <sub>真机截图 · 人格页</sub>
+</div>
+
 ## 🤝 已经装了别的记忆插件？
 
-不用卸载，也不用担心「打架」：插件只读扫描已装的记忆来源（Mnemon 运行时记忆 / 项目文档 / DSH_HOME 下其它 SQLite 记忆表），按七层规则分类后导入；源数据一个字节都不改，重复内容自动合并，导入幂等。装在一起，各记各的，新的还能并进来。
+如果你已经装了别的记忆插件，最怕的其实不是「冲突」，是「它不再是我以前那个它了」。
+
+不用担心，也不用卸载重养：这个插件能把旧插件里的记忆和性格接过来——记忆按七层重新归位，人格叙事、风格卡、文风包一起搬；只读扫描，源数据一个字节都不改，重复内容自动合并，导入幂等。市面上几乎没有第二家这么做。
+
+你的它，还是你的它。
+
+<div align="center">
+  <img src="docs/screenshots/memory.jpg" alt="记忆页：只读扫描其他插件的记忆，按七层分类后导入" width="280" />
+  <br/>
+  <sub>真机截图 · 记忆页：只读扫描与合并</sub>
+</div>
 
 ## 🧩 功能全景
 
@@ -105,6 +122,12 @@ DSH 的会话越聊越长，主模型的上下文却只有那么大：旧对话�
 - **`acp_status`**：上下文压力、可压缩范围、分层块列表；无 live session 时回退到最近一次落库的压力值。
 
 细节：压力提示分 45% / 75% / 95% 三档；超时 60 秒的 pending 块标记 orphan；被 billion-context 占用工具名时自动整体让位，不抢注册。
+
+<div align="center">
+  <img src="docs/screenshots/compression.jpg" alt="压缩页：上下文压力、可压缩范围与压缩块列表" width="280" />
+  <br/>
+  <sub>真机截图 · 压缩页</sub>
+</div>
 
 ### 2）七层长期记忆
 
@@ -121,6 +144,12 @@ DSH 的会话越聊越长，主模型的上下文却只有那么大：旧对话�
 - **按人隔离**：`resolveScope` 三级回退（session header → 绑定 → 默认 → global），同一台设备上的不同对话各记得各的。
 - **惦记清单（followup）**：`add / list / done / silence`，带到期时间与大小标记；每天最多提醒一件，对方情绪明显负面或说过「别问了」时自动静默。
 - **危机分级**：零成本词法判断 0–5 级（平稳 → 轻微低落 → 明显负面 → 消沉 → 自伤风险 → 急迫危机），只用于调整回应分寸，不替代专业判断；等级在两轮之间不衰减，需要在面板手动清除。
+
+<div align="center">
+  <img src="docs/screenshots/overview.jpg" alt="陪伴速览：心情、心声、压力、阀门、叙事与记忆/压缩块" width="280" />
+  <br/>
+  <sub>真机截图 · 陪伴速览</sub>
+</div>
 
 ### 4）沟通风格学习
 
@@ -158,6 +187,12 @@ DSH 的会话越聊越长，主模型的上下文却只有那么大：旧对话�
 - **文风包**：按场合蒸馏语气统计；面板可固定 `packScene`，也可关掉 `voicePack` 省 token。私聊没有语料时会借最大场合的口气，并明确标注「只借句式和口癖」。
 
 > 学习能力需要本机装有 [fishtalk](https://github.com/Nozzi2455/fishtalk) 插件；找不到时返回 `fishtalk_missing`，其余功能不受影响。
+
+<div align="center">
+  <img src="docs/screenshots/learning.jpg" alt="学习页：语料库、文风包、B 站联网学习与投喂" width="280" />
+  <br/>
+  <sub>真机截图 · 学习页</sub>
+</div>
 
 ### 9）记忆合并
 

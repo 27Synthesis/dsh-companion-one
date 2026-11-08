@@ -3,7 +3,8 @@
 </div>
 
 <div align="center">
-  <img src="docs/cover.svg" alt="companion-one — a companion layer for DSH" width="100%" />
+  <img src="docs/cover.svg" alt="companion-one — a five-region persona" width="100%" />
+  <img src="docs/cover-memory.svg" alt="companion-one — one plugin, a whole companionship system" width="100%" />
 </div>
 
 <div align="center">
@@ -40,7 +41,7 @@ The usual fix is a stack of plugins — one for compression, one for memory, one
 | | Capability | In one line |
 | :--: | --- | --- |
 | 🎭 | **Plastic persona · five-region model** | perception / emotion / executive / narrative / expression in parallel; three-layer consolidation; four valves as priors |
-| 🤝 | **Coexists with other memory plugins** | read-only merge of Mnemon / project docs / other SQLite memory; sources untouched, duplicates merged |
+| 🤝 | **Coexists with other memory plugins** | no uninstall: old memories and personality carried over; read-only, sources untouched, duplicates merged |
 | 🐟 | **Living-human feel** | learns real comments from Bilibili, feeds corpora, distils style packs; fights AI tone |
 | 🧠 | **Seven-layer long-term memory** | soul / user / project / fact / lesson / topic / rules; per-person scope, fact validity windows, key invalidation |
 | 🗜️ | **Built-in compression engine** | tiered folding, accepts only summaries that are truly shorter, stable block refs, archived originals are searchable and restorable |
@@ -86,9 +87,25 @@ The “I” is not an external commander; it is the predictive–explanatory–c
 
 > In code this lands on persona_reaction / persona_chain / persona_narrative plus four valves: at most one valve moves per turn, ≤150 tokens injected; promote adds a narrative version, rollback restores, freeze makes it read-only. Whether it truly “gives birth to an I” is for time and conversation to judge — but the direction is that the model's self-knowledge accumulates, can be reviewed, and can be revised, instead of being performed from scratch every turn.
 
+<div align="center">
+  <img src="docs/screenshots/persona.jpg" alt="Persona tab: narrative v4, four valves, deliberation layer and version history" width="280" />
+  <br/>
+  <sub>Real dsh-go screenshot · Persona</sub>
+</div>
+
 ## 🤝 Already using another memory plugin?
 
-No need to uninstall anything, and no fear of a fight: the plugin scans installed memory sources read-only (Mnemon runtime memory / project documents / other SQLite memory tables under DSH_HOME), classifies them into the seven layers, and imports. Source data is not touched by a single byte, duplicates merge, and imports are idempotent. They can live side by side, each remembering its own thing — and the new one can absorb the old.
+If you already have a memory plugin, the worry is not really a “conflict” — it is “it won't be the same one I raised anymore.”
+
+No need to worry, and no need to uninstall and start over: this plugin can take the old memories and personality over — memories re-filed into the seven layers, the persona narrative, style cards and style packs carried along; read-only scan, not a byte changed at the source, duplicates merged, imports idempotent. Almost no other plugin in the market does this.
+
+Your companion is still your companion.
+
+<div align="center">
+  <img src="docs/screenshots/memory.jpg" alt="Memory tab: read-only scan of other plugins' memories, imported into seven layers" width="280" />
+  <br/>
+  <sub>Real dsh-go screenshot · Memory: read-only scan and merge</sub>
+</div>
 
 ## 🧩 Feature panorama
 
@@ -102,6 +119,12 @@ A four-piece set with the same semantics as the host's compression tool, stored 
 - **`acp_status⟫** — context pressure, compressible ranges, tiered block list; without a live session it falls back to the last persisted pressure.
 
 Details: pressure hints at 45% / 75% / 95%; pending blocks older than 60s are marked orphan; if billion-context already owns the tool names, the plugin steps aside instead of fighting registration.
+
+<div align="center">
+  <img src="docs/screenshots/compression.jpg" alt="Compression tab: pressure, compressible range and block list" width="280" />
+  <br/>
+  <sub>Real dsh-go screenshot · Compression</sub>
+</div>
 
 ### 2) Seven-layer long-term memory
 
@@ -118,6 +141,12 @@ Details: pressure hints at 45% / 75% / 95%; pending blocks older than 60s are ma
 - **Per-person scope** — `resolveScope⟫ falls back three levels (session header → binding → default → global), so different conversations on one device remember separately.
 - **Follow-ups** — `add / list / done / silence⟫, with due time and size; at most one reminder per day, automatically silenced when the mood is clearly negative or you said “stop asking”.
 - **Crisis grading** — a zero-cost lexical 0–5 scale (steady → slightly low → clearly negative → withdrawn → self-harm risk → acute crisis), used only to adjust tone, never as professional judgement; the level does not decay between turns and must be cleared in the panel.
+
+<div align="center">
+  <img src="docs/screenshots/overview.jpg" alt="Companion snapshot: mood, heart voice, pressure, valves, narrative" width="280" />
+  <br/>
+  <sub>Real dsh-go screenshot · Companion snapshot</sub>
+</div>
 
 ### 4) Communication style learning
 
@@ -154,6 +183,12 @@ The fishtalk checks are ported into the plugin (MIT), with no online dependency:
 - **Style packs** — tone statistics distilled per scene; the panel can pin `packScene⟫ or turn `voicePack⟫ off to save tokens. In private chats with no corpus, it borrows the largest scene's tone and labels it as “sentence shape and verbal tics only”.
 
 > Learning requires the [fishtalk](https://github.com/Nozzi2455/fishtalk) plugin on the same machine; without it the tools return `fishtalk_missing⟫ and everything else keeps working.
+
+<div align="center">
+  <img src="docs/screenshots/learning.jpg" alt="Learning tab: corpus, style pack, Bilibili study and feeding" width="280" />
+  <br/>
+  <sub>Real dsh-go screenshot · Learning</sub>
+</div>
 
 ### 9) Memory import
 
