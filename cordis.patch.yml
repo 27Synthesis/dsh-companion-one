@@ -1,0 +1,11 @@
+# companion-one — 自包含陪伴单体插件（压缩/记忆/陪伴/风格/人格全部内置）
+# 只用 insert(id/name/config)，不改写别人的行。
+- insert:
+    - id: companion-one
+      name: companion-one
+      config:
+        compression: true
+        memory: true
+        companion: true
+        style: true
+        persona: true

@@ -1,0 +1,84 @@
+{
+  "name": "companion-one",
+  "version": "0.1.0",
+  "description": "自包含陪伴单体插件：内置上下文压缩、七层记忆、陪伴行为层、沟通风格学习与可塑人格。",
+  "type": "module",
+  "main": "index.js",
+  "license": "MIT",
+  "icon": "icon.svg",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-renderer"
+      ]
+    }
+  },
+  "engines": {
+    "node": ">=22.13.0",
+    "dsh": ">=0.2.0 <0.3.0"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "icon.svg",
+    "lib/",
+    "locale/",
+    "README.md"
+  ],
+  "keywords": [
+    "dsh-plugin",
+    "companion",
+    "memory",
+    "context-compression",
+    "persona"
+  ],
+  "dshGo": {
+    "v": 1,
+    "title": {
+      "zh": "陪伴",
+      "en": "Companion"
+    },
+    "icon": "heart",
+    "contributes": {
+      "panels": [
+        {
+          "id": "mood",
+          "title": "陪伴速览",
+          "icon": "heart",
+          "placement": [
+            "session.tab",
+            "features",
+            "chat.panel"
+          ]
+        }
+      ],
+      "composer.strip": [
+        {
+          "id": "moodstrip",
+          "icon": "heart",
+          "panel": "mood"
+        }
+      ]
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/27Synthesis/dsh-companion-one.git"
+  },
+  "homepage": "https://github.com/27Synthesis/dsh-companion-one",
+  "bugs": {
+    "url": "https://github.com/27Synthesis/dsh-companion-one/issues"
+  }
+}
