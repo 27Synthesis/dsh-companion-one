@@ -11,13 +11,14 @@
 
 **一个插件，一整套陪伴系统。**
 
-DSH 的长期记忆、上下文压缩、陪伴分寸与说话方式，全部内置；再加一个会在对话里慢慢长出自己的「我」的五区人格。  
-不需要装第二个插件，不需要编译任何原生模块。
+五区可塑人格、七层长期记忆、内置上下文压缩、与其他记忆插件只读合并、B 站学真人说话的文风包，再加上陪伴分寸与第一人称心声——全部内置。  
+不装第二个插件、不编译原生模块、默认不增加额外模型调用；静态导引常驻，动态上下文一次性注入，token 花在刀刃上。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-4c9f70?style=flat-square)](LICENSE)
 [![Node ≥ 22.13](https://img.shields.io/badge/node-%E2%89%A5%2022.13-339933?style=flat-square&logo=node.js&logoColor=white)](#运行要求)
 [![DSH plugin](https://img.shields.io/badge/DSH-plugin-1d6fa5?style=flat-square)](#安装)
 [![Tests](https://img.shields.io/badge/tests-11%20suites-brightgreen?style=flat-square)](#测试)
+[![token-frugal](https://img.shields.io/badge/token-frugal-6c5ce7?style=flat-square)](https://github.com/27Synthesis/dsh-companion-one#省-token-的几笔账)
 [![node:sqlite · FTS5](https://img.shields.io/badge/storage-node%3Asqlite%20%C2%B7%20FTS5-003b57?style=flat-square&logo=sqlite&logoColor=white)](#数据与隐私)
 
 </div>
@@ -45,12 +46,24 @@ DSH 的会话越聊越长，主模型的上下文却只有那么大：旧对话�
 | 🐟 | **活人感** | B 站联网学真人评论、投喂语料、蒸馏文风包；专治 AI 腔与鱼八股 |
 | 🧠 | **七层长期记忆** | soul / user / project / fact / lesson / topic / rules，按人隔离，事实带有效期与键失效 |
 | 🗜️ | **内置压缩引擎** | 分层折叠、只收「确实更短」的摘要、稳定块引用、被折叠原文可检索可还原 |
+| ⚡ | **省 token** | 零额外模型调用；静态导引只注册一次，动态注入按 300/120/200/150 预算，用完即弃 |
 | 💗 | **陪伴行为层** | 惦记清单、到期分寸、危机词法分级、对话安静期的自我克制 |
 | 🗣️ | **沟通风格学习** | 从句长、口头禅、标点、表情学起，只学形状，不搬内容 |
 | 💬 | **心情 + 心声** | valence / energy 两因素心情，每轮一句第一人称心声，只展示、不写回人格 |
 | 🖥️ | **面板 + 工具** | 8 个页签的设置面板、13 个工具、8 个 dshGo 原生视图、HTTP API |
 | 🧩 | **11 套测试** | 压缩、记忆、陪伴、风格、人格、心情、学习、导入、冲突、回归全覆盖 |
 | 🛡️ | **安全细节** | 导入只读、密钥过滤、写接口防 CSRF、冲突时整体让位 |
+
+## ⚡ 省 token 的几笔账
+
+陪伴要长期在线，token 就不能乱烧。这个插件的默认策略是「能不调就不调、能少注入就少注入」：
+
+- **零额外模型调用**：不做 staging / observer 式的二次总结；压力 ≥95% 时只注入一句提示，由当前模型自己决定何时压缩。
+- **静态导引只注册一次**：人设、规则、七层说明不反复重写 system prompt，KV 缓存保持命中。
+- **动态上下文一次性注入**：首轮快照 300 / 关键词命中 120 / 压缩后快照 300 / 风格卡 200 / 人格阀门 150（token），用完即弃。
+- **只收更短的摘要**：压缩阈值 85%，摘要必须比原文短才接受，越压越小，不会「摘要越压越大」。
+- **文风包可关**：不用学口气时关掉 `voicePack`，每轮省约 60–80 token。
+- **面板可看账**：压缩页直接显示估算用量、压力与每个块省了多少 token，花在哪一目了然。
 
 ## 🎭 先看这个：可塑人格的五区模型
 

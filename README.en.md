@@ -11,13 +11,14 @@
 
 **One plugin. A whole companionship system.**
 
-Long-term memory, context compression, companionship boundaries, your way of speaking — and a five-region persona that slowly grows a self through conversation, all built in.
-No second plugin to install, no native module to compile.
+A five-region plastic persona, seven-layer long-term memory, built-in context compression, read-only merge with other memory plugins, style packs learned from real Bilibili comments, companionship boundaries and a first-person heart voice — all built in.
+No second plugin, no native module to compile, and no extra model calls by default. The static guide registers once, dynamic context is injected one-shot, and tokens go where they matter.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-4c9f70?style=flat-square)](LICENSE)
 [![Node ≥ 22.13](https://img.shields.io/badge/node-%E2%89%A5%2022.13-339933?style=flat-square&logo=node.js&logoColor=white)](#requirements)
 [![DSH plugin](https://img.shields.io/badge/DSH-plugin-1d6fa5?style=flat-square)](#install)
 [![Tests](https://img.shields.io/badge/tests-11%20suites-brightgreen?style=flat-square)](#tests)
+[![token-frugal](https://img.shields.io/badge/token-frugal-6c5ce7?style=flat-square)](https://github.com/27Synthesis/dsh-companion-one#where-the-tokens-go-and-how-they-are-saved)
 [![node:sqlite · FTS5](https://img.shields.io/badge/storage-node%3Asqlite%20%C2%B7%20FTS5-003b57?style=flat-square&logo=sqlite&logoColor=white)](#data--privacy)
 
 </div>
@@ -45,12 +46,24 @@ The usual fix is a stack of plugins — one for compression, one for memory, one
 | 🐟 | **Living-human feel** | learns real comments from Bilibili, feeds corpora, distils style packs; fights AI tone |
 | 🧠 | **Seven-layer long-term memory** | soul / user / project / fact / lesson / topic / rules; per-person scope, fact validity windows, key invalidation |
 | 🗜️ | **Built-in compression engine** | tiered folding, accepts only summaries that are truly shorter, stable block refs, archived originals are searchable and restorable |
+| ⚡ | **Token-frugal** | no extra model calls; static guide registered once; dynamic hints budgeted at 300/120/200/150 and discarded |
 | 💗 | **Companionship behaviour** | follow-up list, due-date boundaries, crisis lexicon grading, restraint during quiet periods |
 | 🗣️ | **Communication style learning** | learns sentence length, catchphrases, punctuation, emoji — the shape, never the content |
 | 💬 | **Mood + heart voice** | two-factor mood (valence / energy); one first-person line per turn, display only, never written back |
 | 🖥️ | **Panel + tools** | 8-tab settings panel, 13 tools, 8 dshGo native views, HTTP API |
 | 🧩 | **11 test suites** | compression, memory, companionship, style, persona, mood, learning, import, conflict, regression |
 | 🛡️ | **Safety details** | read-only import, secret filtering, CSRF-safe write API, graceful surrender on tool-name conflicts |
+
+## ⚡ Where the tokens go (and how they are saved)
+
+Companionship runs all day, so tokens cannot burn all day. The default policy: call less, inject less.
+
+- **Zero extra model calls** — no staging/observer summarisation; at ≥95% pressure the plugin only injects a hint and lets the current model decide when to compress.
+- **The static guide registers once** — persona, rules and layer descriptions never rewrite the system prompt every turn, so the KV cache stays hot.
+- **Dynamic context is injected one-shot** — first-turn snapshot 300 / keyword hits 120 / post-compression snapshot 300 / style card 200 / persona valves 150 (tokens), then discarded.
+- **Only shorter summaries are accepted** — the 85% threshold makes compression shrink, never grow.
+- **Style packs can be switched off** — turn off `voicePack` to save about 60–80 tokens per turn when you do not need the tone.
+- **The panel shows the bill** — the Compression tab reports estimated usage, pressure, and how many tokens each block saved.
 
 ## 🎭 First, the special part: a five-region plastic persona
 
