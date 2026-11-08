@@ -1,5 +1,9 @@
 <div align="center">
-  <img src="docs/banner.svg" alt="Companion One" width="100%" />
+  <a href="README.en.md">English</a> · <a href="README.md"><b>简体中文</b></a>
+</div>
+
+<div align="center">
+  <img src="docs/cover.svg" alt="companion-one — 把对话，过成日子" width="100%" />
 </div>
 
 <div align="center">

@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-label="companion-one — 把对话，过成日子">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#06090F"/>
+      <stop offset="0.52" stop-color="#0A101D"/>
+      <stop offset="1" stop-color="#0D1527"/>
+    </linearGradient>
+    <radialGradient id="glowWarm" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#FF9E5E" stop-opacity="0.26"/>
+      <stop offset="0.55" stop-color="#FF9E5E" stop-opacity="0.07"/>
+      <stop offset="1" stop-color="#FF9E5E" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowCool" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#6E7BFF" stop-opacity="0.22"/>
+      <stop offset="0.6" stop-color="#6E7BFF" stop-opacity="0.05"/>
+      <stop offset="1" stop-color="#6E7BFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="titleGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#C7D4FF"/>
+    </linearGradient>
+    <linearGradient id="amberGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#FFD39B"/>
+      <stop offset="1" stop-color="#FF8E5C"/>
+    </linearGradient>
+    <pattern id="dots" width="30" height="30" patternUnits="userSpaceOnUse">
+      <circle cx="1.6" cy="1.6" r="1.1" fill="#FFFFFF" opacity="0.055"/>
+    </pattern>
+  </defs>
+
+  <rect width="1280" height="640" fill="url(#bg)"/>
+  <rect width="1280" height="640" fill="url(#dots)"/>
+  <ellipse cx="1010" cy="120" rx="560" ry="380" fill="url(#glowWarm)"/>
+  <ellipse cx="110" cy="628" rx="470" ry="330" fill="url(#glowCool)"/>
+
+  <!-- eyebrow -->
+  <g font-family="'Noto Sans SC','Noto Sans CJK SC',sans-serif">
+    <circle cx="97" cy="85" r="4" fill="#FFB262"/>
+    <text x="114" y="90" font-size="13.5" font-weight="700" letter-spacing="3.4" fill="#8B99BA">DSH · COMPANION LAYER · V0.1.0</text>
+  </g>
+
+  <!-- title -->
+  <g font-family="'Noto Sans SC','Noto Sans CJK SC',sans-serif">
+    <text x="86" y="216" font-size="86" font-weight="700" fill="url(#titleGrad)" letter-spacing="-1.5">companion<tspan fill="url(#amberGrad)">-one</tspan></text>
+    <text x="90" y="292" font-size="38" font-weight="700" fill="#EDF2FF" letter-spacing="1.5">把对话，过成日子。</text>
+    <text x="92" y="338" font-size="17" fill="#93A1C4" letter-spacing="0.2">Memory, compression, persona — a companion that stays.</text>
+  </g>
+
+  <!-- feature chips -->
+  <g font-family="'Noto Sans SC','Noto Sans CJK SC',sans-serif" font-size="15">
+    <rect x="92" y="378" width="100" height="40" rx="20" fill="#FFB262" fill-opacity="0.10" stroke="#FFB262" stroke-opacity="0.38"/>
+    <text x="142" y="403" text-anchor="middle" fill="#FFD3A2" font-weight="700">七层记忆</text>
+    <rect x="200" y="378" width="115" height="40" rx="20" fill="#FFFFFF" fill-opacity="0.035" stroke="#FFFFFF" stroke-opacity="0.11"/>
+    <text x="257.5" y="403" text-anchor="middle" fill="#C9D5F2">上下文压缩</text>
+    <rect x="323" y="378" width="100" height="40" rx="20" fill="#FFFFFF" fill-opacity="0.035" stroke="#FFFFFF" stroke-opacity="0.11"/>
+    <text x="373" y="403" text-anchor="middle" fill="#C9D5F2">可塑人格</text>
+    <rect x="431" y="378" width="100" height="40" rx="20" fill="#FFFFFF" fill-opacity="0.035" stroke="#FFFFFF" stroke-opacity="0.11"/>
+    <text x="481" y="403" text-anchor="middle" fill="#C9D5F2">风格学习</text>
+    <rect x="539" y="378" width="100" height="40" rx="20" fill="#FFFFFF" fill-opacity="0.035" stroke="#FFFFFF" stroke-opacity="0.11"/>
+    <text x="589" y="403" text-anchor="middle" fill="#C9D5F2">主动关心</text>
+  </g>
+
+  <!-- stat line -->
+  <line x1="92" y1="456" x2="640" y2="456" stroke="#FFFFFF" stroke-opacity="0.07"/>
+  <text x="92" y="497" font-family="'Noto Sans SC','Noto Sans CJK SC',sans-serif" font-size="15" fill="#8B99BB" letter-spacing="0.3">13 个工具 · 11 套测试 · 1 个 SQLite 库 · 0 个外部依赖</text>
+
+  <!-- footer -->
+  <text x="92" y="596" font-family="'Noto Sans SC','Noto Sans CJK SC',sans-serif" font-size="13.5" fill="#7784A4" letter-spacing="0.4">github.com/27Synthesis/dsh-companion-one</text>
+  <text x="1188" y="596" text-anchor="end" font-family="'Noto Sans SC','Noto Sans CJK SC',sans-serif" font-size="13" fill="#6D7A9A" letter-spacing="0.3">MIT · SQLite + FTS5 · zero native builds</text>
+
+  <!-- right: recall bubble -->
+  <g font-family="'Noto Sans SC','Noto Sans CJK SC',sans-serif">
+    <rect x="788" y="50" width="344" height="94" rx="18" fill="#101A2E" stroke="#FFFFFF" stroke-opacity="0.10"/>
+    <rect x="788" y="50" width="344" height="94" rx="18" fill="url(#glowWarm)" opacity="0.35"/>
+    <circle cx="810" cy="78" r="3.2" fill="#FFB262"/>
+    <text x="822" y="82" font-size="10.5" font-weight="700" letter-spacing="2.4" fill="#C79A6B">RECALL</text>
+    <text x="808" y="114" font-size="18" fill="#F2F6FF">你上次说，想早点睡。</text>
+    <text x="808" y="133" font-size="11" fill="#8B99BA">七层记忆 · 自动命中 · 不用你重复</text>
+    <line x1="960" y1="146" x2="960" y2="168" stroke="#FFB262" stroke-opacity="0.45" stroke-dasharray="2 5"/>
+  </g>
+
+  <!-- right: memory stack -->
+  <g font-family="'Noto Sans SC','Noto Sans CJK SC',sans-serif" font-size="14.5" font-weight="700" letter-spacing="1.6">
+    <g>
+      <rect x="806" y="170" width="368" height="50" rx="13" fill="#FFB262" fill-opacity="0.075" stroke="#FFB262" stroke-opacity="0.32"/>
+      <rect x="822" y="181" width="3" height="28" rx="1.5" fill="#FFB262"/>
+      <text x="840" y="200" fill="#F2E4D2">SOUL</text>
+      <text x="1150" y="200" text-anchor="end" font-weight="500" letter-spacing="0.5" fill="#D8BFA3" font-size="13">自我</text>
+    </g>
+    <g>
+      <rect x="812" y="226" width="368" height="50" rx="13" fill="#FF8FA8" fill-opacity="0.06" stroke="#FF8FA8" stroke-opacity="0.26"/>
+      <rect x="828" y="237" width="3" height="28" rx="1.5" fill="#FF8FA8"/>
+      <text x="846" y="256" fill="#F0DDE2">USER</text>
+      <text x="1156" y="256" text-anchor="end" font-weight="500" letter-spacing="0.5" fill="#D8A7B1" font-size="13">对方</text>
+    </g>
+    <g>
+      <rect x="818" y="282" width="368" height="50" rx="13" fill="#8A9BFF" fill-opacity="0.07" stroke="#8A9BFF" stroke-opacity="0.28"/>
+      <rect x="834" y="293" width="3" height="28" rx="1.5" fill="#8A9BFF"/>
+      <text x="852" y="312" fill="#DFE3FA">PROJECT</text>
+      <text x="1162" y="312" text-anchor="end" font-weight="500" letter-spacing="0.5" fill="#AEB6E6" font-size="13">项目</text>
+    </g>
+    <g>
+      <rect x="824" y="338" width="368" height="50" rx="13" fill="#6FE3C1" fill-opacity="0.07" stroke="#6FE3C1" stroke-opacity="0.28"/>
+      <rect x="840" y="349" width="3" height="28" rx="1.5" fill="#6FE3C1"/>
+      <text x="858" y="368" fill="#DDF5EE">FACT</text>
+      <text x="1168" y="368" text-anchor="end" font-weight="500" letter-spacing="0.5" fill="#9FD8C6" font-size="13">事实</text>
+    </g>
+    <g>
+      <rect x="830" y="394" width="368" height="50" rx="13" fill="#C39BFF" fill-opacity="0.07" stroke="#C39BFF" stroke-opacity="0.28"/>
+      <rect x="846" y="405" width="3" height="28" rx="1.5" fill="#C39BFF"/>
+      <text x="864" y="424" fill="#EAE0FA">LESSON</text>
+      <text x="1174" y="424" text-anchor="end" font-weight="500" letter-spacing="0.5" fill="#C6AEE6" font-size="13">教训</text>
+    </g>
+    <g>
+      <rect x="836" y="450" width="368" height="50" rx="13" fill="#5FC8FF" fill-opacity="0.07" stroke="#5FC8FF" stroke-opacity="0.28"/>
+      <rect x="852" y="461" width="3" height="28" rx="1.5" fill="#5FC8FF"/>
+      <text x="870" y="480" fill="#DCEEFA">TOPIC</text>
+      <text x="1180" y="480" text-anchor="end" font-weight="500" letter-spacing="0.5" fill="#9FC6DE" font-size="13">话题</text>
+    </g>
+    <g>
+      <rect x="842" y="506" width="368" height="50" rx="13" fill="#F0D06B" fill-opacity="0.07" stroke="#F0D06B" stroke-opacity="0.28"/>
+      <rect x="858" y="517" width="3" height="28" rx="1.5" fill="#F0D06B"/>
+      <text x="876" y="536" fill="#F4ECCE">RULES</text>
+      <text x="1186" y="536" text-anchor="end" font-weight="500" letter-spacing="0.5" fill="#D6C48F" font-size="13">准则</text>
+    </g>
+  </g>
+</svg>

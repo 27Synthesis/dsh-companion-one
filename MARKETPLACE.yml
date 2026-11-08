@@ -1,0 +1,16 @@
+# 提交到 awesome-dsh-plugin（插件市场）
+#
+# 步骤：
+#   1. Fork https://github.com/awesome-dsh-plugin/awesome-dsh-plugin
+#   2. 新建文件 data/plugins/27Synthesis__dsh-companion-one.yml
+#   3. 内容就是下面这一份（category 用 memory）
+#   4. 开 PR，标题例如：add 27Synthesis/dsh-companion-one
+#
+# 另外：给仓库加 GitHub topic `dsh-plugin`（已加：dsh、dsh-plugin、companion、memory、sqlite、fts5、context-compression、persona、llm）
+
+url: https://github.com/27Synthesis/dsh-companion-one
+name: 27Synthesis/dsh-companion-one
+category: memory
+description:
+  en: 'A complete companion layer for the dsh-go native phone UI: seven-layer local memory (soul/user/project/fact/lesson/topic/rules) with per-person scope and fact validity, built-in context compression with searchable and restorable block refs, communication-style cards learned from your own messages, a plastic persona with four valves and rollback, companionship boundaries (follow-up cadence, crisis lexicon grading), and a first-person heart voice. One plugin, one SQLite file via node:sqlite + FTS5, zero native builds, no traffic proxying, and no extra model calls by default; all data stays on the device.'
+  zh: '面向 dsh-go 手机原生界面的完整陪伴层：七层本地记忆（soul/user/project/fact/lesson/topic/rules），按人隔离、事实带有效期与失效；内置上下文压缩，块引用可检索可还原；从你原话学习沟通风格卡；可塑人格带四阀门与回滚；陪伴分寸（惦记节奏、危机词法分级）与第一人称心声。一个插件、一个 SQLite 文件（node:sqlite + FTS5）、零原生编译、不接管网络、默认不增加额外模型调用；数据全部留在本机。'
