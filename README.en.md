@@ -10,7 +10,7 @@
 
 **One plugin. A whole companionship system.**
 
-Long-term memory, context compression, companionship boundaries, and your way of speaking — all built in.
+Long-term memory, context compression, companionship boundaries, your way of speaking — and a five-region persona that slowly grows a self through conversation, all built in.
 No second plugin to install, no native module to compile.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-4c9f70?style=flat-square)](LICENSE)
@@ -39,18 +39,56 @@ The usual fix is a stack of plugins — one for compression, one for memory, one
 
 | | Capability | In one line |
 | :--: | --- | --- |
+| 🎭 | **Plastic persona · five-region model** | perception / emotion / executive / narrative / expression in parallel; three-layer consolidation; four valves as priors |
+| 🤝 | **Coexists with other memory plugins** | read-only merge of Mnemon / project docs / other SQLite memory; sources untouched, duplicates merged |
+| 🐟 | **Living-human feel** | learns real comments from Bilibili, feeds corpora, distils style packs; fights AI tone |
 | 🧠 | **Seven-layer long-term memory** | soul / user / project / fact / lesson / topic / rules; per-person scope, fact validity windows, key invalidation |
 | 🗜️ | **Built-in compression engine** | tiered folding, accepts only summaries that are truly shorter, stable block refs, archived originals are searchable and restorable |
 | 💗 | **Companionship behaviour** | follow-up list, due-date boundaries, crisis lexicon grading, restraint during quiet periods |
 | 🗣️ | **Communication style learning** | learns sentence length, catchphrases, punctuation, emoji — the shape, never the content |
-| 🎭 | **Plastic persona** | reaction / chain / narrative tables + four valves; promote, rollback, freeze |
-| 🐟 | **Plain-human speech** | fishtalk rules and statistical checks, self-review every turn, auto-correction next turn |
 | 💬 | **Mood + heart voice** | two-factor mood (valence / energy); one first-person line per turn, display only, never written back |
-| 📚 | **Learning centre** | Bilibili study, corpus feeding, style-pack distillation; learned tone flows back into expression |
-| 🔀 | **Memory import** | read-only import from Mnemon runtime memory, project docs, and other SQLite memory tables; layered de-duplication |
 | 🖥️ | **Panel + tools** | 8-tab settings panel, 13 tools, 8 dshGo native views, HTTP API |
 | 🧩 | **11 test suites** | compression, memory, companionship, style, persona, mood, learning, import, conflict, regression |
 | 🛡️ | **Safety details** | read-only import, secret filtering, CSRF-safe write API, graceful surrender on tool-name conflicts |
+
+## 🎭 First, the special part: a five-region plastic persona
+
+This is not a persona prompt bolted onto the model; it is an attempt to let the model form a picture of itself through conversation.
+
+**Five regions, interacting in parallel — not a serial pipeline**
+
+| Region | Role |
+| --- | --- |
+| ① Perception–interoception | takes in the world and its own state: what happened, how am I now |
+| ② Emotion–value | tags input as threat / reward / relevance / “about me”, and decides where attention goes |
+| ③ Executive–working memory | holds goals, inhibits impulses, plans, meta-cognizes — a workbench for chain-of-thought |
+| ④ Persona–narrative | integrates “who I am”, explains the past, predicts the future, builds the self-narrative |
+| ⑤ Language–social expression | turns the narrative into expression that can be reflected on and shared |
+
+**Three layers of consolidation: chain-of-thought → persona**
+
+- **Reaction layer** — default tendencies of emotion and attention (temperament, reactivity)
+- **Deliberation layer** — repeatedly used chains of thought (explanatory style, decision paths)
+- **Narrative layer** — self-story and value ordering (“I am this kind of person”), which filters which chains can be called
+
+**Persona as a prior, adjusting thought through four valves**
+
+- **Attention valve** — opportunity or threat first
+- **Explanation valve** — attribution style for the same event
+- **Emotion valve** — threshold and recovery speed
+- **Goal valve** — long-term priority that constrains current reasoning
+
+**A two-way loop**
+
+environment input → ① perception → ② emotional weighting → ③ deliberation → ④ narrative integration → behaviour output → feedback → reinforce/revise chains → consolidate/reshape persona → persona as a prior, adjusting ①–④
+
+The “I” is not an external commander; it is the predictive–explanatory–constraining model generated in ④: predicts and constrains beforehand, integrates during, and tells a coherent story afterwards.
+
+> In code this lands on persona_reaction / persona_chain / persona_narrative plus four valves: at most one valve moves per turn, ≤150 tokens injected; promote adds a narrative version, rollback restores, freeze makes it read-only. Whether it truly “gives birth to an I” is for time and conversation to judge — but the direction is that the model's self-knowledge accumulates, can be reviewed, and can be revised, instead of being performed from scratch every turn.
+
+## 🤝 Already using another memory plugin?
+
+No need to uninstall anything, and no fear of a fight: the plugin scans installed memory sources read-only (Mnemon runtime memory / project documents / other SQLite memory tables under DSH_HOME), classifies them into the seven layers, and imports. Source data is not touched by a single byte, duplicates merge, and imports are idempotent. They can live side by side, each remembering its own thing — and the new one can absorb the old.
 
 ## 🧩 Feature panorama
 
@@ -87,7 +125,9 @@ Details: pressure hints at 45% / 75% / 95%; pending blocks older than 60s are ma
 - Produces a **style card** (≤200 tokens injected), editable and toggleable in the panel; turning it off stops injection immediately and keeps existing cards.
 - The “Style” tab supports “learn one line” and deleting a single card.
 
-### 5) Plastic persona
+### 5) Plastic persona (the five-region model in practice)
+
+The five-region design is above; in code it lands on three tables, four valves and one expression layer.
 
 - **Three tables** — `persona_reaction⟫, `persona_chain⟫, `persona_narrative⟫.
 - **Four valves** — attention (opportunity/threat/relationship/task), explanation (method/ability/situation/others), emotional threshold (0–1, higher = steadier), goal priority (0–1). At most one valve moves per turn; ≤150 tokens injected.
@@ -331,17 +371,19 @@ companion-one/
 - [ ] Proactive alert at crisis level 5 (waiting for dshGo to expose it)
 - [ ] Feed compression-block entities back into the `fact⟫ layer
 
-## 🙏 Credits and licences
+## 🙏 Acknowledgements
 
-This repository is an **original implementation**. It borrows mechanisms and rules from the projects below, not their code trees or build scripts:
+This plugin stands on many shoulders. None of these projects wrote a line for this repository, but their mechanisms, rules, post-mortems and public discussions form its foundation; the code comments mark each borrowed point. The five-region persona model, its three tables and four valves are an original design of this project.
 
-- **Compression tool semantics and tiered folding**: [billion-context](https://github.com/ranxianglei/billion-context) — the four-piece set, shorter-only summaries, stable block refs, tiers; rewritten on `node:sqlite⟫ without network interception.
-- **Seven-layer memory schema and injection paths**: [dsh-meow-memory](https://github.com/Phant0Meow) (MIT) — table-structure ideas and three injection paths; MIT licence and attribution retained.
-- **Companionship mechanisms**: [dsh-companion-memory](https://github.com/lvzhuojun) — per-person scope, fact validity, follow-up boundaries, crisis lexicon grading; storage and engine are our own.
-- **Style-learning approach**: [dsh-natural-dialogue](https://github.com/aki66938) — “expression learned from the user's own words”; storage and injection implemented here.
-- **Plain-human rules**: [fishtalk](https://github.com/Nozzi2455/fishtalk) (MIT) — checks and corpus-distillation interface.
+- **[billion-context](https://github.com/ranxianglei/billion-context)** · @ranxianglei — semantics of the compression four-piece set, tiered folding, shorter-only summaries, stable block refs and tiers. Rewritten here on node:sqlite without network interception.
+- **[dsh-meow-memory](https://github.com/Phant0Meow)** · @Phant0Meow (MIT) — the seven-layer schema idea and three injection paths; MIT licence and attribution retained.
+- **[dsh-companion-memory](https://github.com/lvzhuojun)** · @lvzhuojun — per-person scope, fact validity, follow-up boundaries, crisis lexicon grading; storage and engine are our own.
+- **[dsh-natural-dialogue](https://github.com/aki66938)** · @aki66938 — the “expression learned from the user's own words” approach; storage and injection implemented here.
+- **[fishtalk](https://github.com/Nozzi2455/fishtalk)** · @Nozzi2455 (MIT) — the plain-human checks, corpus-distillation interface, and the “fish-speak” vocabulary.
+- **[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)** and the dsh-go team — the host, plugin mechanism and mobile runtime.
+- **[awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)** — the market index and listing conventions.
 
-Comments in the code mark each borrowed point with its source repository and file path.
+Thanks also to every developer who publishes plugins, post-mortems and usage notes in the open — in this ecosystem, publishing is itself a form of help. If an acknowledgement is missing, open an issue and it will be added.
 
 ## 📄 License
 
