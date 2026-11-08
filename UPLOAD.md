@@ -37,7 +37,10 @@ PR 描述建议强调这句，市场上没人占这个位置：
 
 ## 4. CI（可选）
 
-本地保留了 `.github/workflows/test.yml`。上次发布用的 token 没有 **Workflows** 写权限，所以远端仓库暂时没有这个文件；要补 CI，给 token 勾上 Workflows 后重新 push，或在网页端手动新建。
+`.github/workflows/test.yml` 的完整内容备份在 `docs/ci-workflow.yml`（上次发布用的 token 没有 **Workflows** 写权限，远端暂未上传）。要启用 CI：
+
+1. 把 `docs/ci-workflow.yml` 复制为 `.github/workflows/test.yml`
+2. 用带 Workflows 权限的 token 推送，或在网页端新建该文件
 
 ## 5. 版本
 

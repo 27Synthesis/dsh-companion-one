@@ -1,0 +1,23 @@
+# Backup of .github/workflows/test.yml.
+# The publish token used for the first upload lacks the "Workflows" write permission,
+# so CI is kept here as a template. Copy this file to .github/workflows/test.yml
+# (or create that file in the GitHub web UI) once a token with Workflows access is available.
+
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+      - name: Run tests
+        run: node --test test/*.test.mjs
