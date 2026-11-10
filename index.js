@@ -16,20 +16,26 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 import { openDb, kvGet, kvSet, LAYERS } from './lib/db.js'
-import { remember, searchMemory, listMemory, updateMemory, deleteMemory, getMemory, extractKeywords } from './lib/memory.js'
+import { remember, searchMemory, listMemory, updateMemory, deleteMemory, getMemory, extractKeywords, captureFacts, bumpHit } from './lib/memory.js'
 import { compressSession, decompressBlock, searchContext, acpStatus, listBlocks, estimateTokens } from './lib/acp.js'
 import { firstTurnSnapshot, hitsPrompt, keywordHits, postCompactionSnapshot, pressureHint, clip } from './lib/inject.js'
 import { resolveScope, classify, CRISIS_GUIDE, bumpCrisis, readCrisis, pickDueFollowUp, markAsked, followUpPrompt, addFollowUp, listFollowUps, setFollowUpStatus, expireStale } from './lib/companion.js'
-import { stylePrompt, learnFromUserText, styleEnabled, listStyle, setStyleEnabled, deleteStyle } from './lib/style.js'
+import { stylePrompt, styleLine, learnFromUserText, styleEnabled, listStyle, setStyleEnabled, deleteStyle } from './lib/style.js'
 import { appraise, valvePrompt, endOfTurn, readValves, currentNarrative, listNarratives, promoteNarrative, rollbackNarrative, isFrozen, setFrozen, topChains, ensureNarrative } from './lib/persona.js'
-import { userState, personaReaction, addHeartVoice, latestHeartVoice, fallbackHeartVoice } from './lib/mood.js'
+import { userState, personaReaction, addHeartVoice, latestHeartVoice, fallbackHeartVoice, angerOf, angerPrompt, reviewHeart } from './lib/mood.js'
 import { expressionStage, checkText, violationHint } from './lib/persona.js'
+import { heartBudget, heartStyleHint } from './lib/style.js'
 import { runOp, settingsSnapshot, setSetting } from './lib/api.js'
 
 export const name = 'companion-one'
 export const inject = ['tools', 'systemPrompt', 'webServer']
 
 const ROUTE = '/companion-one/api'
+// 四个阀门的内部取值 → 面板上的人话（别把 task / method 这种原始值直接摆给主人看）
+const VALVE_LABELS = {
+  attention: { opportunity: '先看机会', threat: '先看风险', relation: '先看关系', task: '先看任务' },
+  explanation: { method: '先归因方法', ability: '先看能力', situation: '先看情境', other: '先看他人' },
+}
 const STATIC_GUIDE = [
   'companion-one 陪伴层（静态导引，恒定文本）：',
   '- 长期记忆在 SQLite 七层里（soul/user/project/fact/lesson/topic/rules）。需要旧事时用 memory_search；',
@@ -37,8 +43,12 @@ const STATIC_GUIDE = [
   '- 上下文压力大时用 acp_status 看可压缩范围，再用 compress 提交忠实摘要（保留最近三条对话）。',
   '  被折叠的历史仍可用 search_context / decompress 取回，不用担心丢。',
   '- 主动关心用 followup 记录「惦记的事」，到期后系统会提醒你自然地问一句。',
-  '- 每轮回复后调用 heart_voice 写一句心声：第一人称 20–60 字，写你此刻真实的反应和刚才回复时的想法；',
-  '  心声只给自己看、不反哺人格，别复述用户原话，也别写成总结或待办。',
+  '- 回答要短：先给结论/先动手，别铺陈背景、别一次推演三条路；拿不准直接说拿不准。',
+  '- 分工写清楚：人的偏好、事实、教训、约定这类长期沉淀 → memory_add / memory_search；',
+  '  项目文档、方案、知识库 → mnemon_document_* 与 mnemon_*；两套别混着写，也别重复记同一件事。',
+  '- 每轮回复后调用 heart_voice 写一句心声：第一人称，像心里嘟囔半句——短、口语、可以只说一半，',
+  '  长度照你平时说话的手感走（通常十来个字，上限跟着学到的句长）。',
+  '  心声只给自己看、不反哺人格：不复述用户原话、不总结这轮做了什么、不写成待办、不解释。',
 ].join('\n')
 
 function dbPath(config) {
@@ -72,7 +82,24 @@ function sessionOf(exec, ctx) {
 export function apply(ctx, config) {
   const cfg = config || {}
   const db = openDb(dbPath(cfg))
+  diagDb = db
+  // WAL 会一直涨：每次启动截断一次；超过 30 天再 vacuum 回收空间
+  try { db.exec('pragma wal_checkpoint(TRUNCATE)') } catch {}
+  try {
+    const lastVacuum = Number(kvGet(db, 'db:vacuum_at', 0)) || 0
+    if (Date.now() - lastVacuum > 30 * 86400000) {
+      db.exec('vacuum')
+      kvSet(db, 'db:vacuum_at', Date.now())
+    }
+  } catch {}
   try { ensureNarrative(db) } catch {}
+  // 面板「健康」是「本次启动以来」的口径：每次启动清零，否则旧异常会一直挂着，
+  // 主人看到的「失败 1」可能几天前就修掉了。
+  try {
+    kvSet(db, 'diag:fail', 0)
+    kvSet(db, 'diag:last', null)
+    kvSet(db, 'diag:note', null)
+  } catch {}
   // 过期事实（valid_until 到点）启动时立刻失效，之后每 10 分钟扫一次
   try { expireStale(db) } catch {}
   ctx.effect(() => {
@@ -98,7 +125,7 @@ export function apply(ctx, config) {
     const id = (session && session.id) || 'unknown'
     let s = state.get(id)
     if (!s) {
-      s = { userMsgs: 0, lastUser: '', lastMsgId: '', lastAssistant: '', postCompact: false, written: [], projects: [], lastPressureHint: 0, moodPrev: null, mood: null, heartWritten: false, voiceHint: '' }
+      s = { userMsgs: 0, lastUser: '', lastMsgId: '', lastAssistant: '', postCompact: false, written: [], projects: [], lastPressureHint: 0, moodPrev: null, mood: null, heartWritten: false, heartTries: 0, voiceHint: '', lastInjectSig: '' }
       state.set(id, s)
       // 长跑引擎里会话会越攒越多：只留最近 200 个会话的瞬时状态（DB 里的记忆不受影响）
       if (state.size > 200) {
@@ -184,12 +211,25 @@ export function apply(ctx, config) {
       // 2) 每消息关键词命中 top-2
       const hits = keywordHits(db, userText, scope, 2)
       const text = hitsPrompt(hits, cfg.hitBudget || 120)
-      if (text) parts.push(text)
+      if (text) { parts.push(text); try { bumpHit(db, hits) } catch {} }
     }
 
-    // 2.5) 明确的「记住/记一下」指令 → 自动落库（模型经常忘了调 memory_add，这里兜底）
+    // 2.5) 主动记忆：先看明确的「记住…」，没有再走保守句式抽取（每轮最多一条）
     if (enabled.memory && realUser) {
       const m = /(?:记住|记一下|记下来|帮我记一下?|别忘了)[：:，,\s]*([^\n。！？!?]{2,100})/.exec(userText)
+      if (!m && cfg.autoCapture !== false) {
+        // 只认「我叫…/我住在…/我在…工作/我养了…/我对…过敏/我喜欢…/我不喜欢…」
+        // 这类结构清楚的自我陈述；拿不准就不记，宁可漏。
+        for (const item of captureFacts(userText, 1)) {
+          try {
+            const res = remember(db, item.layer, { content: item.content, scope, source: 'auto:pattern' })
+            if (!s.written.includes(res.id)) {
+              s.written.push(res.id)
+              if (s.written.length > 60) s.written = s.written.slice(-60)
+            }
+          } catch (err) { log(ctx, 'auto capture failed', err) }
+        }
+      }
       if (m && m[1].trim().length >= 2) {
         try {
           const res = remember(db, 'fact', { content: m[1].trim(), scope, source: 'auto:explicit' })
@@ -223,34 +263,44 @@ export function apply(ctx, config) {
         const prev = readCrisis(db, scope)
         if (prev.level >= 3 && Date.now() - (prev.at || 0) < 3 * 86400000) parts.push(CRISIS_GUIDE[prev.level])
       }
-      if (realUser) {
+      // 主人在气头上时先别递「惦记的事」，不然像没听见他说话
+      const raging = realUser && angerOf(userText).strong
+      if (realUser && !raging) {
         const due = pickDueFollowUp(db, scope, { userText })
         if (due) {
           parts.push(followUpPrompt(due))
           markAsked(db, due.id)
         }
       }
+      // 4.5) 主人在发火：先给一句接住情绪的行为提示（≤30 token），
+      // 不然模型会照着「安心」的心情慢悠悠讲道理，越讲越炸。
+      if (realUser) {
+        const rage = angerPrompt(userText)
+        if (rage) parts.push(rage)
+      }
     }
 
-    // 5) 风格卡片（一次性后处理提示）
-    if (enabled.style && styleEnabled(db) && realUser) {
-      learnFromUserText(db, userText)
-      const sp = stylePrompt(db)
-      if (sp) parts.push(clip(sp, 200))
-    }
-
-    // 6) 人格阀门（一次性调节，≤150 token）
-    if (enabled.persona) {
-      parts.push(clip(valvePrompt(db), 150))
-    }
-
-    // ⑥ ⑤区·语言—社会表达：生成前最后一次调音——人话优先，压掉鱼八股（fishtalk 底座）
-    if (enabled.persona) {
-      try {
-        const expr = expressionStage(db, { publicScene: !!cfg.publicScene, pack: enabled.voicePack !== false, scene: enabled.packScene || '' })
-        if (expr) parts.push(clip(expr, 200))
-        if (s.voiceHint) { parts.push(clip(s.voiceHint, 60)); s.voiceHint = '' }
-      } catch (err) { log(ctx, 'expression stage failed', err) }
+    // 5)+6)+⑥ 稳定层（风格 / 四阀门 / 表达规则）：一轮只注入一次，并合并成一段。
+    // 同一个 turn 的第 2..n 步里，这些内容已经在上下文里；每步重发等于白烧 token。
+    // 三段本来有重叠（都在说「短、别术语」），合并后再按总预算裁一次。
+    if (realUser) {
+      const stable = []
+      let styleText = ''
+      if (enabled.style && styleEnabled(db)) {
+        learnFromUserText(db, userText)
+        styleText = styleLine(db)
+      }
+      if (enabled.persona) {
+        stable.push(clip(valvePrompt(db), 110))
+        try {
+          const expr = expressionStage(db, { publicScene: !!cfg.publicScene, pack: enabled.voicePack !== false, scene: enabled.packScene || '', styleText })
+          if (expr) stable.push(clip(expr, 170))
+        } catch (err) { log(ctx, 'expression stage failed', err) }
+      }
+      const merged = stable.filter(Boolean).join('\n')
+      if (merged) parts.push(clip(merged, cfg.stableBudget || 260))
+      // 上一轮冒了鱼味才有的纠偏，跟着稳定层走一次就够
+      if (s.voiceHint) { parts.push(clip(s.voiceHint, 60)); s.voiceHint = '' }
     }
 
     // 7) 上下文压力：每步只算一次，压力提示与面板状态共用（原来这里算了两遍）
@@ -264,9 +314,28 @@ export function apply(ctx, config) {
     }
 
     // 会话即时状态：给 dsh-go 侧边面板读（心情 / 压力 / 轮数）
-    if (session) saveSessionState(session, scope, s, userText, status ? status.pressure : 0)
+    // 心情只在「真的来了新发言」时重算；同一 turn 的后续步骤只更新压力与轮数，
+    // 否则一条消息会把心情反复算、把情绪余温越叠越重。
+    if (session) saveSessionState(session, scope, s, realUser ? userText : '', status ? status.pressure : 0)
 
     const text = parts.filter(Boolean).join('\n\n')
+    // 注入明细（面板「明细」页用）：哪几段、各多少 token、合计多少
+    if (session && text) {
+      try {
+        // 同一条消息的多步里文本没变就不重复写库（省掉每步一次 SQLite 写）
+        const sig = String(s.userMsgs) + ':' + text.length + ':' + text.slice(0, 24)
+        if (s.lastInjectSig !== sig) {
+          s.lastInjectSig = sig
+          const detail = parts.filter(Boolean).map((piece) => ({
+            label: String(piece).replace(/\s+/g, ' ').slice(0, 16),
+            tokens: estimateTokens(piece),
+          }))
+          kvSet(db, 'inject:last:' + session.id, {
+            at: Date.now(), total: estimateTokens(text), parts: detail,
+          })
+        }
+      } catch {}
+    }
     if (!text) return decision
     const message = {
       id: randomUUID(),
@@ -283,14 +352,15 @@ export function apply(ctx, config) {
     const s = st(session)
     const user = s.lastUser
     const said = s.lastAssistant
-    // 先落状态再提前返回：没有可识别用户发言的轮次也要把标记清掉，
-    // 否则 heartWritten 会带到下一轮、让下一轮误以为「已经写过心声」。
+    // 先记住本轮模型有没有写过心声，再清标记（清晚了会漏到下一轮）。
+    const heartWrittenThisTurn = s.heartWritten
     s.heartWritten = false
+    s.heartTries = 0
     s.lastUser = ''
     s.lastAssistant = ''
     if (!user) return
     const weight = appraise(user)
-    const outcome = classify(user).level >= 2 ? 'negative' : 'positive'
+    const outcome = classify(user).level >= 2 || angerOf(user).strong ? 'negative' : 'positive'
     if (enabled.persona) {
       try {
         // 人格只由用户发言驱动；心声（heart_voice）不进入这里
@@ -304,13 +374,13 @@ export function apply(ctx, config) {
       } catch (err) { log(ctx, 'persona update failed', err) }
     }
     // 心声兜底：模型没调用 heart_voice 时，用当前心情写一句模板，面板会标注「自动」。
-    if (enabled.companion !== false && !s.heartWritten) {
+    if (enabled.companion !== false && !heartWrittenThisTurn) {
       try {
         const reaction = s.mood || { mood: '安心' }
         addHeartVoice(db, {
           sessionId: session?.id,
           scope: scopeOf(session),
-          content: fallbackHeartVoice(reaction),
+          content: fallbackHeartVoice(reaction, { userText: user, round: s.userMsgs }),
           mood: reaction.mood,
           source: 'auto',
           userText: user,
@@ -510,9 +580,17 @@ export function apply(ctx, config) {
       execute: async (args, exec) => {
         const session = sessionOf(exec, ctx)
         const scope = scopeOf(session)
-        if (args.action === 'add') return { ok: true, id: addFollowUp(db, { scope, content: args.content, dueAt: args.dueAt, size: args.size, source: session?.id }) }
+        if (args.action === 'add') {
+          const content = String(args.content || '').trim()
+          if (!content) return { ok: false, reason: 'content_required', hint: 'add 必须给 content：要惦记的那件事' }
+          return { ok: true, id: addFollowUp(db, { scope, content, dueAt: args.dueAt, size: args.size, source: session?.id }) }
+        }
         if (args.action === 'list') return { rows: listFollowUps(db, scope, { limit: 50 }) }
-        if (args.action === 'done') return { ok: true, row: setFollowUpStatus(db, args.id, 'done') }
+        if (args.action === 'done') {
+          if (!args.id) return { ok: false, reason: 'id_required' }
+          return { ok: true, row: setFollowUpStatus(db, args.id, 'done') }
+        }
+        if (!args.id) return { ok: false, reason: 'id_required' }
         return { ok: true, row: setFollowUpStatus(db, args.id, 'silenced') }
       },
     })
@@ -558,9 +636,9 @@ export function apply(ctx, config) {
 
     reg({
       name: 'heart_voice',
-      description: '写完一轮回复后记一句「心声」：第一人称 20–60 字，写你看到主人这句话时真实的反应、以及刚才回复时的想法。只用于陪伴面板展示，不写回人格或记忆；每轮以最后一次为准。',
+      description: '写完一轮回复后记一句「心声」：第一人称，像自己在心里嘟囔半句——短、口语、可以只说一半，别用完整文章腔。跟聊天用同一种语气（学到什么口吻就用什么口吻）。只用于陪伴面板展示，不写回人格或记忆；每轮以最后一次为准。写得太长或太像总结会被打回，改短一句话再说。',
       parameters: P({
-        content: { type: 'string', description: '第一人称心声，20–60 字；不要复述用户原话，不要写成总结或待办' },
+        content: { type: 'string', description: '第一人称心声：一小句，通常 6–30 字；不要复述用户原话、不要写成总结/待办、不要解释' },
         mood: { type: 'string', description: '可选：此刻心情词，省略则用系统算出的心情' },
         seq: { type: 'number' },
       }, ['content']),
@@ -570,6 +648,21 @@ export function apply(ctx, config) {
         const content = String(args.content || '').trim()
         if (!content) return { ok: false, reason: 'empty' }
         const reaction = s.mood || {}
+        // 心声也要过一遍「像不像人话」：太长、或者一句里就冒出套话，先打回一次让模型自己改。
+        const budget = heartBudget(db)
+        const review = reviewHeart(content, { max: budget.max })
+        if (!review.ok && s.heartTries < 1) {
+          s.heartTries = (s.heartTries || 0) + 1
+          return {
+            ok: false,
+            reason: 'rewrite',
+            hint: review.hint,
+            length: review.length,
+            max: budget.max,
+            target: heartStyleHint(db) || '短、口语',
+            okToRetry: true,
+          }
+        }
         const row = addHeartVoice(db, {
           sessionId: session?.id,
           scope: scopeOf(session),
@@ -580,7 +673,7 @@ export function apply(ctx, config) {
           seq: args.seq,
         })
         s.heartWritten = true
-        return { ok: true, id: row?.id, content: row?.content, mood: row?.mood }
+        return { ok: true, id: row?.id, content: row?.content, mood: row?.mood, max: budget.max }
       },
     })
   })
@@ -608,6 +701,12 @@ export function apply(ctx, config) {
           'setScope', 'ftFeed', 'ftLearn', 'ftCancel', 'crisisClear',
         ])
         try {
+          // 同源校验：挡掉跨站页面/跨站请求。本机其它进程仍可能伪造请求头，
+          // 真要更严需要给路由加 token（见交接文档「风险」）。
+          const host = String((req.headers && req.headers.host) || '')
+          const origin = String((req.headers && req.headers.origin) || '')
+          if (origin && !origin.endsWith('://' + host)) { send(403, { ok: false, error: 'cross_origin' }); return }
+          if (String((req.headers && req.headers['sec-fetch-site']) || '') === 'cross-site') { send(403, { ok: false, error: 'cross_site' }); return }
           const url = new URL(req.url || '/', 'http://127.0.0.1')
           const op = url.searchParams.get('op') || 'overview'
           if (WRITE_OPS.has(op)) {
@@ -622,7 +721,13 @@ export function apply(ctx, config) {
           let body = {}
           if (req.method && req.method !== 'GET') {
             const chunks = []
-            for await (const chunk of req) chunks.push(chunk)
+            let size = 0
+            const MAX_BODY = 256 * 1024
+            for await (const chunk of req) {
+              size += chunk.length
+              if (size > MAX_BODY) { send(413, { ok: false, error: 'body_too_large' }); return }
+              chunks.push(chunk)
+            }
             const raw = Buffer.concat(chunks).toString('utf8')
             body = raw ? JSON.parse(raw) : {}
           }
@@ -674,8 +779,8 @@ export function apply(ctx, config) {
         heart: heart ? String(heart.content) : '',
         heartSource: heart ? heart.source : '',
         moodHint: row ? (row.user_msgs + ' 轮 · ' + new Date(row.updated_at).toLocaleTimeString()) : '还没有对话记录',
-        attention: valves.attention,
-        explanation: valves.explanation,
+        attention: VALVE_LABELS.attention[valves.attention] || valves.attention,
+        explanation: VALVE_LABELS.explanation[valves.explanation] || valves.explanation,
         emotion: String(valves.emotion),
         goal: String(valves.goal),
         safety,
@@ -700,8 +805,8 @@ export function apply(ctx, config) {
             type: 'keyValue',
             items: [
               ['主人此刻', { $: 'data.userState' }],
-              ['注意', { $: 'data.attention' }],
-              ['解释', { $: 'data.explanation' }],
+              ['关注点', { $: 'data.attention' }],
+              ['归因方式', { $: 'data.explanation' }],
               ['情绪阈值', { $: 'data.emotion' }],
               ['目标优先级', { $: 'data.goal' }],
               ['安全', { $: 'data.safety' }],
@@ -748,6 +853,8 @@ export function apply(ctx, config) {
 // 定时任务发送时是 'schedule'。插件注入的 user 角色消息（plugin:*、runtime-context、
 // 工具结果、mnemon 的 delegated review 等）一律不算——否则脏文本会把心情和心声带偏。
 const USER_TEXT_KINDS = new Set(['user', 'schedule'])
+// 插件注入成 user 角色的杂讯（委托评审、运行时上下文等）——不是主人说的话
+const INJECTED_TEXT = /^\[(?:dsh-[a-z0-9-]+|plugin[:：]|runtime-context|companion-one[:：])/i
 
 function extractUserMessage(messages) {
   if (!Array.isArray(messages)) return null
@@ -760,6 +867,9 @@ function extractUserMessage(messages) {
     if (typeof content === 'string') text = content.trim()
     else if (Array.isArray(content)) text = content.filter((b) => b && b.type === 'text').map((b) => b.text).join(' ').trim()
     if (!text) continue
+    // 有些插件会把工具结果/委托评审注入成 user 角色（source.kind 仍是 user），
+    // 这类文本不是主人说的：按固定前缀和「untrusted evidence」标记挡掉，免得污染心情和危机分级。
+    if (INJECTED_TEXT.test(text)) continue
     // 没有 id 时用内容当去重键（同一条消息的重复前缀仍能认出来）
     return { id: m.id || 'text:' + text.slice(0, 60), text }
   }
@@ -772,8 +882,25 @@ function notify(ctx, title, text) {
   } catch {}
 }
 
+let diagDb = null
+
 function log(ctx, msg, err) {
   try {
     if (ctx.logger && typeof ctx.logger.warn === 'function') ctx.logger.warn('[companion-one] ' + msg + ': ' + String(err && err.message || err))
+  } catch {}
+  // 静默吞错是最难查的问题：至少留个计数和最后一条，面板能看到
+  try {
+    if (diagDb) {
+      const errText = err == null ? '' : String((err && err.message) != null ? err.message : err)
+      // 只有真异常才计数；「让位给 billion-context」这类是正常提示，不该算失败。
+      // 注意：某些异常 message 为空（抛的是字符串或普通对象），别把它记成 "undefined"。
+      if (errText && errText !== 'undefined' && errText !== 'null') {
+        const n = Number(kvGet(diagDb, 'diag:fail', 0)) || 0
+        kvSet(diagDb, 'diag:fail', n + 1)
+        kvSet(diagDb, 'diag:last', { at: Date.now(), msg, err: errText.slice(0, 200) })
+      } else {
+        kvSet(diagDb, 'diag:note', { at: Date.now(), msg })
+      }
+    }
   } catch {}
 }

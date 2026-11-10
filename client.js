@@ -18,6 +18,8 @@ window.__ModuleLoader__.load({
     const CSS = [
       '.co-panel{padding:2px 0 8px;font-size:13px;color:var(--dsw-alias-label-primary);display:flex;flex-direction:column;gap:12px}',
       '.co-tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--dsw-alias-border-l1);padding-bottom:6px}',
+      '.co-subtabs{display:flex;gap:4px;flex-wrap:wrap;padding:6px 0 2px 6px}',
+      '.co-subtab{font-size:12px;padding:4px 9px;opacity:.85}',
       '.co-tab{background:transparent;border:none;color:var(--dsw-alias-label-secondary);padding:6px 10px;border-radius:6px;cursor:pointer;font-size:13px}',
       '.co-tab:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}',
       '.co-tab.on{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-brand-primary);font-weight:600}',
@@ -100,6 +102,7 @@ window.__ModuleLoader__.load({
       const s = data.settings || {}
       const set = async (key, value) => { await api('setSetting', { key, value }, 'POST'); refresh() }
       const layers = data.layers || {}
+      const ss = data.sessionState || {}
       const toggles = [
         ['memory', '七层记忆'], ['compression', '压缩引擎'], ['companion', '陪伴行为层'],
         ['style', '沟通风格学习'], ['persona', '可塑人格'], ['voicePack', '文风包进 ⑤ 区'],
@@ -123,6 +126,18 @@ window.__ModuleLoader__.load({
           h('div', { className: 'co-kv', key: 'k3' }, [h('span', { key: 'a' }, '累计节省 tokens（估算）'), h('span', { key: 'b' }, String(data.tokensSaved || 0))]),
           h('div', { className: 'co-kv', key: 'k4' }, [h('span', { key: 'a' }, '惦记的事'), h('span', { key: 'b' }, String((data.followUps || []).filter((f) => f.status === 'open' || f.status === 'asked').length))]),
           h('div', { className: 'co-kv', key: 'k5' }, [h('span', { key: 'a' }, '危机等级'), h('span', { key: 'b' }, String((data.crisis && data.crisis.level) || 0))]),
+        ]),
+        h('div', { className: 'co-card', key: 'mood' }, [
+          h('div', { key: 't', className: 'co-title' }, '此刻心情'),
+          h('div', { key: 'm', style: { fontSize: 15, fontWeight: 600 } }, ss.mood || '还没听到主人说话，我在旁边等着'),
+          h('div', { key: 'w', className: 'co-muted' }, ss.moodWhy || (ss.mood ? '' : '聊一句就有了')),
+          h('div', { key: 'kv', style: { display: 'flex', flexDirection: 'column', gap: 2 } }, [
+            h('div', { key: 'u', className: 'co-kv' }, [h('span', {}, '主人此刻'), h('span', {}, ss.userState || '—')]),
+            h('div', { key: 'v', className: 'co-kv' }, [h('span', {}, '情绪值'), h('span', {}, ss.mood ? Number(ss.valence || 0).toFixed(2) : '—')]),
+            h('div', { key: 'p', className: 'co-kv' }, [h('span', {}, '上下文压力'), h('span', {}, ss.mood ? Math.round(Number(ss.pressure || 0)) + '%' : '—')]),
+            h('div', { key: 'n', className: 'co-kv' }, [h('span', {}, '本会话轮数'), h('span', {}, String(ss.userMsgs || 0))]),
+          ]),
+          ss.updatedAt ? h('div', { key: 'at', className: 'co-muted' }, '更新于 ' + new Date(ss.updatedAt).toLocaleString()) : null,
         ]),
         h('div', { className: 'co-card', key: 'heart' }, [
           h('div', { key: 't', className: 'co-title' }, '心声（最近一句）'),
@@ -262,7 +277,8 @@ window.__ModuleLoader__.load({
     function Compression({ data, refresh }) {
       const [status, setStatus] = useState(null)
       const [open, setOpen] = useState(null)
-      useEffect(() => { api('acpStatus', { windowTokens: 128000 }).then(setStatus).catch(() => {}) }, [])
+      // 带上当前会话 id：不带的话后端只能回 0，面板永远显示 0% 压力
+      useEffect(() => { api('acpStatus', { windowTokens: 128000, sessionId: sessionIdFromHash() }).then(setStatus).catch(() => {}) }, [])
       return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, [
         h('div', { className: 'co-card', key: 's' }, [
           h('div', { className: 'co-title' }, '上下文压力'),
@@ -339,6 +355,9 @@ window.__ModuleLoader__.load({
     function Style({ data, refresh }) {
       const [rows, setRows] = useState(data.style || [])
       const [enabled, setEnabled] = useState(!!data.styleEnabled)
+      // 概览刷新/删除后把卡片数据同步过来，别一直显示打开面板时的旧值
+      useEffect(() => { setRows(data.style || []) }, [data.style])
+      useEffect(() => { setEnabled(!!data.styleEnabled) }, [data.styleEnabled])
       return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, [
         h(Row, { key: 'sw' }, [
           h(Switch, { on: enabled, onChange: async (v) => { const r = await api('styleToggle', { value: v }, 'POST'); setEnabled(!!r.enabled); refresh() } }),
@@ -377,10 +396,18 @@ window.__ModuleLoader__.load({
             h('button', { className: 'co-btn', onClick: async () => { await api('personaRollback', {}, 'POST'); reload() } }, '回滚上一版'),
           ]),
         ]),
+        p.last ? h('div', { className: 'co-card', key: 'last' }, [
+          h('div', { className: 'co-title', key: 't' }, '最近一次迭代'),
+          h('div', { key: 'w', className: 'co-muted' },
+            new Date(p.last.at).toLocaleString() + ' · ' + (p.last.outcome === 'negative' ? '负面信号' : '正向信号') +
+            (p.last.weight != null ? ' · 权重 ' + p.last.weight : '')),
+          h('div', { key: 'c' }, (p.last.changed && p.last.changed.length) ? p.last.changed.join('；') : '这轮没有变化（信号太平）'),
+          p.last.chain ? h('div', { key: 'ch', className: 'co-muted' }, '推演：' + p.last.chain) : null,
+        ]) : null,
         h('div', { className: 'co-card', key: 'v' }, [
           h('div', { className: 'co-title' }, '四个阀门'),
-          h('div', { className: 'co-kv' }, [h('span', {}, '注意'), h('span', {}, String(valves.attention))]),
-          h('div', { className: 'co-kv' }, [h('span', {}, '解释'), h('span', {}, String(valves.explanation))]),
+          h('div', { className: 'co-kv' }, [h('span', {}, '关注点'), h('span', {}, ({ opportunity: '先看机会', threat: '先看风险', relation: '先看关系', task: '先看任务' })[valves.attention] || String(valves.attention))]),
+          h('div', { className: 'co-kv' }, [h('span', {}, '归因方式'), h('span', {}, ({ method: '先归因方法', ability: '先看能力', situation: '先看情境', other: '先看他人' })[valves.explanation] || String(valves.explanation))]),
           h('div', { className: 'co-kv' }, [h('span', {}, '情绪阈值'), h('span', {}, String(valves.emotion))]),
           h('div', { className: 'co-kv' }, [h('span', {}, '目标优先级'), h('span', {}, String(valves.goal))]),
           h('div', { className: 'co-muted' }, '速率上限：每轮最多微调一个阀门；每次更新都记录来源会话与事件序号。'),
@@ -523,6 +550,15 @@ window.__ModuleLoader__.load({
         catch (e) { setMsg('开始失败：' + (e.message || e)) }
       }
 
+      const cancel = async () => {
+        try {
+          const r = await api('ftCancel', {}, 'POST')
+          setJob(r.job || null)
+          setMsg('已取消这次学习')
+          load()
+        } catch (e) { setMsg('取消失败：' + (e.message || e)) }
+      }
+
       const s = stats || {}
       const running = job && job.state === 'running'
       return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, [
@@ -570,6 +606,7 @@ window.__ModuleLoader__.load({
             h('input', { className: 'co-input', value: target, onChange: (e) => setTarget(e.target.value), placeholder: '分区名，如 知识区；或 搜:关键词' }),
             h('input', { className: 'co-input', type: 'number', min: 1, max: 10, value: limit, onChange: (e) => setLimit(e.target.value), style: { flex: '0 0 66px' } }),
             h('button', { className: 'co-btn co-btn-primary', onClick: () => learn().catch(() => {}) }, running ? '学习中…' : '开始学习'),
+            running ? h('button', { className: 'co-btn', onClick: () => cancel().catch(() => {}) }, '取消') : null,
           ]),
           running
             ? h('div', { key: 'j', className: 'co-muted' }, '找到 ' + (job.found || 0) + ' 个，读了 ' + (job.read || 0) + ' 条，新增 ' + (job.added || 0) + ' 条…')
@@ -593,33 +630,89 @@ window.__ModuleLoader__.load({
       ])
     }
 
+    function Diag({ sessionId }) {
+      const [d, setD] = useState(null)
+      const [err, setErr] = useState('')
+      const load = useCallback(async () => {
+        try { setD(await api('diag', { sessionId: sessionId || '' })); setErr('') } catch (e) { setErr(String(e.message || e)) }
+      }, [sessionId])
+      useEffect(() => { load() }, [load])
+      const inj = d && d.inject
+      const rows = []
+      if (inj && inj.parts) {
+        inj.parts.forEach((p, i) => rows.push(h('div', { key: 'p' + i, className: 'co-kv' }, [h('span', {}, p.label + '…'), h('span', {}, p.tokens + ' tok')])))
+        rows.push(h('div', { key: 'sum', className: 'co-kv' }, [h('span', {}, '合计'), h('span', {}, inj.total + ' tok')]))
+      }
+      return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, [
+        h('div', { className: 'co-card', key: 'a' }, [
+          h('div', { className: 'co-title', key: 't' }, '本轮注入（最近一次发给模型的提示）'),
+          h('div', { key: 'h', className: 'co-muted' }, d && d.usedSession ? '来自会话 ' + String(d.usedSession).slice(0, 12) + '…' : '还没记录到任何注入'),
+          err ? h('div', { key: 'e', className: 'co-muted' }, '读取失败：' + err) : null,
+          !inj ? h('div', { key: 'n', className: 'co-muted' }, '这个会话还没有注入记录（发一句话再看看）') : h('div', { key: 'l', className: 'co-list' }, rows),
+        ]),
+        h('div', { className: 'co-card', key: 'b' }, [
+          h('div', { className: 'co-title', key: 't' }, '健康'),
+          h('div', { className: 'co-kv', key: 'f' }, [h('span', {}, '注入失败次数'), h('span', {}, String((d && d.fails) || 0))]),
+          h('div', { key: 'n2', className: 'co-muted' }, '只统计真异常；正常提示（比如把压缩让给 billion-context）不算失败。'),
+          d && d.note ? h('div', { key: 'n3', className: 'co-muted' }, '最近提示：' + d.note.msg) : null,
+          h('div', { className: 'co-kv', key: 's' }, [h('span', {}, '数据库大小'), h('span', {}, d ? (Math.round(d.dbSize / 1024) + ' KB') : '—')]),
+          d && d.last ? h('div', { key: 'l2', className: 'co-muted' }, '最近一次：' + d.last.msg + ' · ' + d.last.err) : null,
+          h(Row, { key: 'r' }, [h('button', { className: 'co-btn', onClick: () => load().catch(() => {}) }, '刷新')]),
+        ]),
+      ])
+    }
+
+    // 页 → 栏：同类的东西收进同一页，原页变成页内一栏（内容原样平移，功能不丢）
     const TABS = [
-      ['overview', '概览'], ['memories', '记忆'], ['soul', '设定'], ['learning', '学习'], ['compression', '压缩'],
-      ['followups', '惦记'], ['style', '风格'], ['persona', '人格'],
+      ['overview', '概览'], ['memories', '记忆'], ['learning', '学习'],
+      ['compression', '压缩'], ['persona', '人格'],
     ]
+    const SUBS = {
+      overview: [['overview', '概览'], ['diag', '明细']],
+      memories: [['memories', '记忆'], ['soul', '设定'], ['followups', '惦记'], ['style', '风格']],
+      learning: [['learning', '学习']],
+      compression: [['compression', '压缩']],
+      persona: [['persona', '人格']],
+    }
 
     function Panel() {
       const [tab, setTab] = useState('overview')
+      const [sub, setSub] = useState('overview')
       const [data, setData] = useState(null)
       const [err, setErr] = useState('')
       const load = useCallback(async () => {
         try { setData(await api('overview', { session: sessionIdFromHash() })); setErr('') } catch (e) { setErr(String(e.message || e)) }
       }, [])
       useEffect(() => { load() }, [load])
+
+      const subs = SUBS[tab] || [['' + tab, '']]
+      // 切页时若当前栏不属于新页，回落到新页第一栏
+      const cur = subs.some(([id]) => id === sub) ? sub : subs[0][0]
+      const pick = (id) => { setTab(id); const first = (SUBS[id] || [[id]])[0][0]; setSub(first) }
+
+      const body = {
+        overview: h(Overview, { key: 'ov', data, refresh: load }),
+        diag: h(Diag, { key: 'dg', sessionId: sessionIdFromHash() }),
+        memories: h(Memories, { key: 'mm', data, refresh: load }),
+        soul: h(SoulEditor, { key: 'sl', data, refresh: load }),
+        followups: h(FollowUps, { key: 'fu', data, refresh: load }),
+        style: h(Style, { key: 'st', data, refresh: load }),
+        learning: h(Learn, { key: 'ln' }),
+        compression: h(Compression, { key: 'cp', data, refresh: load }),
+        persona: h(Persona, { key: 'pe', data, refresh: load }),
+      }[cur]
+
       return h('div', { className: 'co-panel' }, [
         h('style', { key: 'css' }, CSS),
         h('div', { className: 'co-tabs', key: 'tabs' }, TABS.map(([id, label]) =>
-          h('button', { key: id, className: 'co-tab' + (tab === id ? ' on' : ''), onClick: () => setTab(id) }, label))),
+          h('button', { key: id, className: 'co-tab' + (tab === id ? ' on' : ''), onClick: () => pick(id) }, label))),
+        subs.length > 1
+          ? h('div', { className: 'co-subtabs', key: 'subs' }, subs.map(([id, label]) =>
+              h('button', { key: id, className: 'co-tab co-subtab' + (cur === id ? ' on' : ''), onClick: () => setSub(id) }, label)))
+          : null,
         err ? h('div', { key: 'err', className: 'co-muted' }, '读取失败：' + err) : null,
         !data ? h('div', { key: 'ld', className: 'co-muted' }, '加载中…') : null,
-        data && tab === 'overview' ? h(Overview, { key: 'ov', data, refresh: load }) : null,
-        data && tab === 'memories' ? h(Memories, { key: 'mm', data, refresh: load }) : null,
-        data && tab === 'soul' ? h(SoulEditor, { key: 'sl', data, refresh: load }) : null,
-        data && tab === 'learning' ? h(Learn, { key: 'ln' }) : null,
-        data && tab === 'compression' ? h(Compression, { key: 'cp', data, refresh: load }) : null,
-        data && tab === 'followups' ? h(FollowUps, { key: 'fu', data, refresh: load }) : null,
-        data && tab === 'style' ? h(Style, { key: 'st', data, refresh: load }) : null,
-        data && tab === 'persona' ? h(Persona, { key: 'pe', data, refresh: load }) : null,
+        data ? body : null,
       ])
     }
 

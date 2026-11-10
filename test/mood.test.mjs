@@ -113,14 +113,15 @@ assert.equal(personaReaction({ state: advice, valves: {} }).mood, '认真')
 assert.equal(personaReaction({ state: neutral, valves: { attention: 'relation' } }).mood, '想陪着你')
 assert.equal(personaReaction({ state: neutral, valves: {} }).mood, '安心')
 
-// 5) 兜底心声：20–60 字、第一人称、按心情给
+// 5) 兜底心声：一小句口语（不是作文），按心情给、不引原话
 const moods = ['揪心', '担心', '心疼', '想念', '开心', '得意', '认真', '心动', '安心', '想陪着你']
 for (const m of moods) {
-  const line = fallbackHeartVoice({ mood: m })
-  assert.ok(line.length >= 20 && line.length <= 60, 'length of ' + m + ': ' + line.length)
-  assert.ok(/主人|我/.test(line))
+  const line = fallbackHeartVoice({ mood: m }, { userText: '今天好累啊' })
+  assert.ok(line.length >= 4 && line.length <= 30, 'length of ' + m + ': ' + line.length)
+  assert.ok(/主人|我|他/.test(line), '第一人称或指向主人: ' + line)
+  assert.ok(!line.includes('（刚听主人说'), '别把原话塞进心声: ' + line)
 }
-assert.ok(fallbackHeartVoice(null).length > 10, 'unknown mood still returns a line')
+assert.ok(fallbackHeartVoice(null).length >= 2, 'unknown mood still returns a line')
 
 // 6) deriveChains 只看用户发言
 assert.deepEqual(deriveChains('不对，你错了'), ['遇到纠正先承认再校准，不辩解'])

@@ -46,9 +46,17 @@ PR 描述建议强调这句，市场上没人占这个位置：
 
 ## 5. 版本
 
-`v0.1.0` 已打在首个提交上。下次功能更新建议：
+已发布：`v0.1.0`（首个提交）、`v0.1.2`（2026-11-10，改动见 `CHANGELOG.md`）。
+`v0.1.1` 是 11-09 的本地部署构建，没单独打标签，内容并入 `v0.1.2`。
+
+发下一个版本：
 
 ```bash
-git tag -a v0.1.1 -m "companion-one v0.1.1"
-git push origin v0.1.1
+# 1) 改 package.json 的 version，补 CHANGELOG
+# 2) 提交
+git add -A && git commit -m "feat: 这次改了什么"
+# 3) 打标签并按标签推送（main 里别写标签名，否则报 ambiguous argument）
+git tag -a v0.1.3 -m "companion-one v0.1.3"
+git push origin refs/tags/v0.1.3:refs/tags/v0.1.3
+git push origin main
 ```

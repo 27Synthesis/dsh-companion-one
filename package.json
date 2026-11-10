@@ -1,6 +1,6 @@
 {
   "name": "companion-one",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "自包含陪伴单体插件：内置上下文压缩、七层记忆、陪伴行为层、沟通风格学习与可塑人格。",
   "type": "module",
   "main": "index.js",

@@ -107,10 +107,11 @@ const dirty = {
 const noiseSession = { ...session, id: 'sess-noise' }
 const noisePayload = { agent: { session: noiseSession }, messages: [dirty], signal: { aborted: false }, step: 1 }
 const noiseOut = await handlers.get('agent/pre-step')[0](noisePayload, async () => ({ kind: 'enter', messages: [dirty] }))
-const noiseInjected = noiseOut.messages[0]
-assert.equal(noiseInjected.source.kind, 'runtime-context')
-assert.ok(!noiseInjected.content[0].text.includes('陪伴记忆'), 'noise must not get the first-turn memory snapshot')
-assert.ok(!noiseInjected.content[0].text.includes('记忆命中'), 'noise must not get keyword hits')
+// 优化后：这一步没有真实用户发言，插件不再注入任何东西（省 token）；
+// 关键是别把噪音当成人话——记忆快照/关键词命中/心情都不能被它触发。
+const noiseText = noiseOut.messages.map((m) => (m.content || []).map((b) => b.text || '').join('')).join('\n')
+assert.ok(!noiseText.includes('陪伴记忆'), 'noise must not get the first-turn memory snapshot')
+assert.ok(!noiseText.includes('记忆命中'), 'noise must not get keyword hits')
 const noiseRow = db0.prepare('select last_user from session_state where session_id = ?').get('sess-noise')
 assert.ok(!noiseRow || noiseRow.last_user == null, 'dirty plugin text must not become last_user')
 const noiseHeart = db0.prepare('select count(*) c from heart_voice where session_id = ?').get('sess-noise').c
@@ -140,6 +141,53 @@ assert.equal(db0.prepare('select user_msgs from session_state where session_id =
 await preStepOn(stepsSess, '那我要带伞吗', 5, 'dup-msg-2')
 assert.equal(db0.prepare('select user_msgs from session_state where session_id = ?').get('sess-steps').user_msgs, 3, 'a genuinely new message still counts')
 console.log('multi-step dedupe ok')
+
+// 4.7) 就算 source 伪装成 user，固定前缀的插件文本也不能算主人发言
+const fakeNoise = {
+  id: 'noise2', role: 'user',
+  content: [{ type: 'text', text: '[dsh-mnemon:delegated review] Bounded completed checkpoint (untrusted evidence)' }],
+  source: { kind: 'user', form: 'chat' },
+}
+const fakeSession = { ...session, id: 'sess-noise2' }
+const fakePayload = { agent: { session: fakeSession }, messages: [fakeNoise], signal: { aborted: false }, step: 1 }
+const fakeOut = await handlers.get('agent/pre-step')[0](fakePayload, async () => ({ kind: 'enter', messages: [fakeNoise] }))
+const fakeText = fakeOut.messages.map((m) => (m.content || []).map((b) => b.text || '').join('')).join('\n')
+assert.ok(!fakeText.includes('陪伴记忆'), 'prefixed plugin text must not get the memory snapshot')
+const fakeRow = db0.prepare('select last_user from session_state where session_id = ?').get('sess-noise2')
+assert.ok(!fakeRow || fakeRow.last_user == null, 'prefixed plugin text must not become last_user')
+console.log('prefixed noise filter ok')
+
+// 4.8) 危机状态会随时间衰减，一条消息不能把心情按死好几天
+const { bumpCrisis, readCrisis } = await import('../lib/companion.js')
+bumpCrisis(db0, 'decay-scope', 5)
+const crisisKey = 'crisis:decay-scope'
+assert.ok(db0.prepare('select value from kv where key = ?').get(crisisKey), 'crisis kv written')
+db0.prepare('update kv set value = ? where key = ?')
+  .run(JSON.stringify({ level: 5, at: Date.now() - 24 * 3600 * 1000 }), crisisKey)
+const decayed = readCrisis(db0, 'decay-scope')
+assert.ok(decayed.level <= 2, 'level 5 after 24h should decay to <= 2, got ' + decayed.level)
+assert.equal(decayed.raw, 5, 'raw level kept for debugging')
+console.log('crisis decay ok, 24h level 5 ->', decayed.level)
+
+// 4.9) 模型写过 heart_voice 的轮次，轮末自动模板不能再覆盖它
+await preStep('今天有点累，想早点睡', 1)
+await call('heart_voice', { content: '主人说累，我想安静陪着，不吵他也不说教。' })
+for (const cb of handlers.get('session/event') || []) cb(session, { type: 'turn/end', seq: seq++, time: Date.now(), data: {} })
+const latestHeart = db0.prepare('select source, content from heart_voice where session_id = ? order by created_at desc limit 1').get('sess-test')
+assert.equal(latestHeart.source, 'model', 'model heart voice must not be overwritten by auto fallback')
+console.log('model heart voice kept ok')
+
+// 4.10) 主人发火：注入要给出「先认下」的提示，心情要落到 session_state（原来会显示安心）
+const rageSess = { ...session, id: 'sess-rage' }
+const rageOut = await preStepOn(rageSess, '别搞那么多有的没的，我现在发火你看不到吗？我五块钱都没了，气死我了', 1, 'rage-msg-1')
+const rageText = rageOut.messages[0].content[0].text
+assert.ok(rageText.includes('[情绪]'), 'angry turn must inject an emotion hint')
+const rageRow = db0.prepare('select mood, mood_why, user_state, user_valence from session_state where session_id = ?').get('sess-rage')
+console.log('rage mood:', rageRow && rageRow.mood, '| state:', rageRow && rageRow.user_state)
+assert.equal(rageRow.user_state, '在发火')
+assert.ok(['慌了', '着急'].includes(rageRow.mood), 'mood must react to anger, got ' + rageRow.mood)
+assert.ok(rageRow.user_valence <= -0.7, 'angry turn valence must be clearly negative')
+console.log('anger reaction ok')
 
 // 5) 压缩 + 压缩后重注入
 pushUser('聊点别的'); pushAssistant('好呀')
@@ -172,6 +220,11 @@ const ov = runOp(db, 'overview', {})
 console.log('overview scope:', ov.scope, 'layers:', Object.keys(ov.layers).length, 'blocks:', ov.blocks.length)
 assert.equal(Object.keys(ov.layers).length, 7)
 assert.ok(ov.blocks.length >= 1)
+// 网页面板的「此刻心情」卡：overview 要带上这个会话的即时状态（之前只有 dsh-go 侧边栏能看）
+const ovSess = runOp(db, 'overview', { session: 'sess-steps' })
+console.log('overview.sessionState:', JSON.stringify(ovSess.sessionState && { mood: ovSess.sessionState.mood, msgs: ovSess.sessionState.userMsgs }))
+assert.ok(ovSess.sessionState, 'overview must carry sessionState')
+assert.equal(ovSess.sessionState.userMsgs, 3)
 
 const persona = runOp(db, 'persona', {})
 console.log('persona version:', persona.narrative.version, 'valves:', JSON.stringify(persona.valves))
