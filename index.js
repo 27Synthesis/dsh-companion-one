@@ -764,6 +764,8 @@ export function apply(ctx, config) {
       const mood = row?.mood || (crisis.level >= 3 ? '担心' : '安心')
       const moodWhy = row?.mood_why || (crisis.level >= 3 ? '主人之前说过那样的话，我还没完全放下心。' : '还没听到主人说话，我在旁边等着。')
       const userState = row?.user_state || (crisis.level >= 3 ? '需要被接住' : '还没开始')
+      // 主人身上难受、难过、发火的时候，面板要先显示「我在意你」，不是我的性格参数。
+      const distressed = /身体不舒服|有点不舒服|很难过|有点低落|很低落|需要被守住|需要被接住|在发火|有点火/.test(userState)
       const safety = crisis.level >= 4 ? '谨慎期·高' : crisis.level >= 3 ? '谨慎期' : crisis.level === 2 ? '留意' : '平稳'
       const follow = open.length
         ? open.map((f) => (f.size === 'big' ? '· ' : '· ') + String(f.content).slice(0, 18)).join('  ')
@@ -779,8 +781,13 @@ export function apply(ctx, config) {
         heart: heart ? String(heart.content) : '',
         heartSource: heart ? heart.source : '',
         moodHint: row ? (row.user_msgs + ' 轮 · ' + new Date(row.updated_at).toLocaleTimeString()) : '还没有对话记录',
-        attention: VALVE_LABELS.attention[valves.attention] || valves.attention,
-        explanation: VALVE_LABELS.explanation[valves.explanation] || valves.explanation,
+        // 主人正难受/在气头上时，别把人格阀门当成此刻的判断摆出来（「先看任务」最伤人）。
+        attention: distressed
+          ? '先看你'
+          : (VALVE_LABELS.attention[valves.attention] || valves.attention),
+        explanation: distressed
+          ? '不找原因，先疼人'
+          : (VALVE_LABELS.explanation[valves.explanation] || valves.explanation),
         emotion: String(valves.emotion),
         goal: String(valves.goal),
         safety,

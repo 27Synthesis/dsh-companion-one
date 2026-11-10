@@ -137,6 +137,7 @@ window.__ModuleLoader__.load({
             h('div', { key: 'p', className: 'co-kv' }, [h('span', {}, '上下文压力'), h('span', {}, ss.mood ? Math.round(Number(ss.pressure || 0)) + '%' : '—')]),
             h('div', { key: 'n', className: 'co-kv' }, [h('span', {}, '本会话轮数'), h('span', {}, String(ss.userMsgs || 0))]),
           ]),
+          ss.recent ? h('div', { key: 'rc', className: 'co-muted' }, '这是最近一轮的存档（' + String(ss.sessionId || '').slice(0, 8) + '），不是当前这条会话') : null,
           ss.updatedAt ? h('div', { key: 'at', className: 'co-muted' }, '更新于 ' + new Date(ss.updatedAt).toLocaleString()) : null,
         ]),
         h('div', { className: 'co-card', key: 'heart' }, [
