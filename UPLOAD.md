@@ -25,7 +25,7 @@ PR 描述建议强调这句，市场上没人占这个位置：
 
 ## 3. 截图
 
-已放入五张真机截图（dsh-go，均裁掉状态栏）：
+已放入七张真机截图（dsh-go，均裁掉状态栏）：
 
 | 文件 | 画面 |
 | --- | --- |
@@ -34,6 +34,8 @@ PR 描述建议强调这句，市场上没人占这个位置：
 | `docs/screenshots/memory.jpg` | 记忆页：只读扫描与合并其他插件记忆 |
 | `docs/screenshots/learning.jpg` | 学习页：语料库、文风包、B 站联网学习 |
 | `docs/screenshots/compression.jpg` | 压缩页：压力、可压缩范围、块列表 |
+| `docs/screenshots/storage.jpg` | 存储页：库 / WAL / 空闲页与内容分组占比 |
+| `docs/screenshots/storage-chat.jpg` | 聊天记录：按会话列条数，可单条删或清空 |
 
 以后换图时保持同名覆盖即可，README 会直接引用。
 

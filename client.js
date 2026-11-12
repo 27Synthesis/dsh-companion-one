@@ -45,6 +45,8 @@ window.__ModuleLoader__.load({
       '.co-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}',
       '.co-kv{display:flex;justify-content:space-between;gap:8px;font-size:12px}',
       '.co-empty{font-size:12px;color:var(--dsw-alias-label-secondary);padding:8px 0}',
+      '.co-code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;padding:6px 8px;border-radius:8px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);overflow-x:auto;white-space:pre}',
+      '.co-frame{width:100%;height:72vh;border:1px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-base)}',
     ].join('\n')
 
     async function api(op, args, method) {
@@ -231,6 +233,10 @@ window.__ModuleLoader__.load({
       const [rows, setRows] = useState([])
       const [q, setQ] = useState('')
       const [draft, setDraft] = useState('')
+      // 清理过期工作类记忆：先拿候选做预览，点了确认才真的归档
+      const [cleanup, setCleanup] = useState(null)
+      const [busy, setBusy] = useState(false)
+      const [notice, setNotice] = useState('')
       const load = useCallback(async () => {
         if (q.trim()) setRows((await api('memorySearch', { query: q.trim(), limit: 30 })).hits)
         else setRows((await api('memories', { layer, limit: 100, scope: data.scope })).rows)
@@ -240,6 +246,21 @@ window.__ModuleLoader__.load({
         if (!draft.trim()) return
         await api('memoryAdd', { layer, content: draft.trim(), scope: data.scope }, 'POST')
         setDraft(''); load(); refresh()
+      }
+      // 预览：只算候选，不动数据
+      const previewCleanup = async () => {
+        if (busy) return
+        setBusy(true)
+        try { setCleanup(await api('memoryCleanup', { scope: data.scope })) } finally { setBusy(false) }
+      }
+      const runCleanup = async () => {
+        if (busy) return
+        setBusy(true)
+        try {
+          const res = await api('memoryCleanup', { scope: data.scope, apply: true }, 'POST')
+          setCleanup(null); load(); refresh()
+          setNotice('已归档 ' + (res.archived || 0) + ' 条工作类记忆（没有删除，可恢复）')
+        } finally { setBusy(false) }
       }
       return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, [
         h(MemoryImport, { key: 'imp', data, refresh }),
@@ -254,6 +275,35 @@ window.__ModuleLoader__.load({
           h('input', { className: 'co-input', placeholder: '新增一条到当前层…', value: draft, onChange: (e) => setDraft(e.target.value) }),
           h('button', { className: 'co-btn co-btn-primary', onClick: () => add().catch(() => {}) }, '添加'),
         ]),
+        h(Row, { key: 'r3' }, [
+          h('button', {
+            className: 'co-btn', disabled: busy,
+            onClick: () => previewCleanup().catch(() => {}),
+          }, busy ? '正在算…' : '清理过期工作记忆'),
+          notice ? h('span', { className: 'co-muted' }, notice) : null,
+        ].filter(Boolean)),
+        // 候选预览：先看清单，确认才归档；一条都不动浏览器里的数据
+        cleanup ? h('div', { className: 'co-card', key: 'cleanup' }, [
+          h('div', { className: 'co-title' }, '清理候选 · ' + (cleanup.count || 0) + ' 条'),
+          h('div', { className: 'co-muted' }, '规则：project / topic / fact 三层里像工作的记忆，按「多久没碰过 + 被用到几次」分档 —— 没被用过 7 天、用过 1–2 次 14 天、用过 3 次以上 21 天。置顶、已失效、soul / user / lesson / rules 一律不动，app 只归档不删除。'),
+          (cleanup.candidates || []).length === 0
+            ? h('div', { className: 'co-empty' }, '没有要清理的')
+            : h('div', { className: 'co-list' }, cleanup.candidates.map((c) => h('div', { key: c.layer + c.id, className: 'co-item' }, [
+              h('div', {}, c.content),
+              h('div', { className: 'co-meta' }, [
+                h('span', { className: 'co-pill' }, c.layer),
+                h('span', { className: 'co-pill warn' }, c.tier),
+                h('span', {}, '已 ' + c.ageDays + ' 天'),
+                h('span', {}, '命中 ' + c.hitCount + ' 次'),
+              ]),
+            ]))),
+          h(Row, {}, [
+            (cleanup.candidates || []).length
+              ? h('button', { className: 'co-btn co-btn-primary', disabled: busy, onClick: () => runCleanup().catch(() => {}) }, '确认归档 ' + cleanup.count + ' 条')
+              : null,
+            h('button', { className: 'co-btn', onClick: () => setCleanup(null) }, '取消'),
+          ].filter(Boolean)),
+        ]) : null,
         h('div', { className: 'co-list', key: 'list' }, rows.length === 0
           ? [h('div', { key: 'e', className: 'co-empty' }, '没有条目')]
           : rows.map((r) => h('div', { key: r.id, className: 'co-item' }, [
@@ -663,10 +713,85 @@ window.__ModuleLoader__.load({
       ])
     }
 
+    /** 只允许站内路径（以 / 开头）：s.page 来自插件状态，别让 javascript:/data: 混进来。 */
+    const safePage = (p) => {
+      const s = String(p || '')
+      return /^\/(?!\/)/.test(s) ? s : ''
+    }
+
+    /** 协作页：大肥鱼 / 鱼记忆原样内嵌，写操作仍在它们自己的页面里发生。 */
+    function Collab() {
+      const [data, setData] = useState(null)
+      const [err, setErr] = useState('')
+      const [openId, setOpenId] = useState('')
+      const [msg, setMsg] = useState('')
+      const load = useCallback(async () => {
+        try { setData(await api('collab')); setErr('') } catch (e) { setErr(String(e.message || e)) }
+      }, [])
+      useEffect(() => { load() }, [load])
+
+      const copy = async (text) => {
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(text); setMsg('命令已复制') }
+          else setMsg('这个环境不给复制，手动抄一下')
+        } catch { setMsg('复制不了，手动抄一下') }
+      }
+
+      const sides = (data && data.sides) || []
+      const cards = sides.map((s) => h('div', { key: s.key, className: 'co-card' }, [
+        h('div', { key: 'hd', style: { display: 'flex', alignItems: 'center', gap: 8 } }, [
+          h('div', { key: 'n', style: { flex: '1', fontSize: 13, fontWeight: 600 } }, s.name),
+          h('span', { key: 'v', className: 'co-pill' + (s.installed ? '' : ' warn') },
+            s.installed ? ('已装' + (s.version ? ' ' + s.version : '')) : '待安装'),
+        ]),
+        h('div', { key: 'w', className: 'co-muted' }, s.what),
+        (s.rows || []).length
+          ? h('div', { key: 'rows', className: 'co-list', style: { maxHeight: 'none' } },
+              s.rows.map(([k, v], i) => h('div', { key: 'r' + i, className: 'co-kv' }, [h('span', {}, k), h('span', {}, String(v))])))
+          : null,
+        s.installed
+          ? h(Row, { key: 'ops' }, [
+              h('button', {
+                key: 'o', className: 'co-btn co-btn-primary',
+                onClick: () => { setOpenId(openId === s.key ? '' : s.key); setMsg('') },
+              }, openId === s.key ? '收起' : '在面板里打开'),
+              h('button', {
+                key: 'w2', className: 'co-btn',
+                onClick: () => { try { const u = safePage(s.page); if (u) window.open(u, '_blank', 'noopener') } catch {} },
+              }, '新窗口打开'),
+            ])
+          : h('div', { key: 'ni', style: { display: 'flex', flexDirection: 'column', gap: 6 } }, [
+              h('div', { key: 'c', className: 'co-code' }, s.install),
+              h(Row, { key: 'r' }, [
+                h('button', { key: 'cp', className: 'co-btn', onClick: () => copy(s.install) }, '复制安装命令'),
+              ]),
+            ]),
+        openId === s.key && s.installed
+          ? h('iframe', { key: 'fr', className: 'co-frame', src: safePage(s.page) || 'about:blank', title: s.name })
+          : null,
+      ]))
+
+      return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, [
+        h('div', { key: 'head', className: 'co-card' }, [
+          h('div', { key: 't', className: 'co-title' }, '协作插件'),
+          h('div', { key: 'd', className: 'co-muted' },
+            '大肥鱼、鱼记忆原样内嵌在下面：装没装、多少东西一眼看到，点开就是它们自己的页面 —— 改设置、删数据也都走它们自己的逻辑。'),
+          data ? h('div', { key: 'p', className: 'co-muted' }, 'profile：' + data.profile) : null,
+          err ? h('div', { key: 'e', className: 'co-muted' }, '读取失败：' + err) : null,
+          h(Row, { key: 'r' }, [
+            h('button', { key: 'rf', className: 'co-btn', onClick: () => load().catch(() => {}) }, '刷新'),
+            msg ? h('span', { key: 'm', className: 'co-muted' }, msg) : null,
+          ]),
+        ]),
+        ...cards,
+        !data && !err ? h('div', { key: 'ld', className: 'co-muted' }, '加载中…') : null,
+      ])
+    }
+
     // 页 → 栏：同类的东西收进同一页，原页变成页内一栏（内容原样平移，功能不丢）
     const TABS = [
       ['overview', '概览'], ['memories', '记忆'], ['learning', '学习'],
-      ['compression', '压缩'], ['persona', '人格'],
+      ['compression', '压缩'], ['persona', '人格'], ['collab', '协作'], ['storage', '存储'],
     ]
     const SUBS = {
       overview: [['overview', '概览'], ['diag', '明细']],
@@ -674,6 +799,129 @@ window.__ModuleLoader__.load({
       learning: [['learning', '学习']],
       compression: [['compression', '压缩']],
       persona: [['persona', '人格']],
+      storage: [['storage', '占用'], ['chat', '聊天记录']],
+      collab: [['collab', '协作']],
+    }
+
+    // 字节 → 人话
+    function fmtSize(n) {
+      const v = Number(n) || 0
+      if (v < 1024) return v + ' B'
+      if (v < 1024 * 1024) return (v / 1024).toFixed(1) + ' KB'
+      return (v / 1024 / 1024).toFixed(1) + ' MB'
+    }
+    const fmtTime = (ts) => (ts ? new Date(ts).toLocaleString() : '—')
+
+    /** 占用：库文件多大、都占在哪一块。 */
+    function Storage() {
+      const [rep, setRep] = useState(null)
+      const [busy, setBusy] = useState(false)
+      const [notice, setNotice] = useState('')
+      const load = useCallback(async () => { setRep(await api('storage')) }, [])
+      useEffect(() => { load().catch(() => {}) }, [load])
+      const tidy = async () => {
+        if (busy) return
+        setBusy(true)
+        try {
+          const r = await api('vacuum', {}, 'POST')
+          setNotice(r.freed > 0 ? '整理完成，释放 ' + fmtSize(r.freed) : '整理完成，没有多余空间可释放')
+          load()
+        } catch (e) { setNotice('整理失败：' + (e.message || e)) } finally { setBusy(false) }
+      }
+      if (!rep) return h('div', { className: 'co-muted' }, '正在统计…')
+      const total = rep.total || 1
+      const c = rep.counts || {}
+      return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, [
+        h('div', { className: 'co-card', key: 'c1' }, [
+          h('div', { className: 'co-title' }, '插件占用 · ' + fmtSize(rep.total)),
+          h('div', { className: 'co-kv' }, [h('span', {}, '库文件'), h('span', {}, fmtSize(rep.file.db))]),
+          h('div', { className: 'co-kv' }, [h('span', {}, 'WAL（还没写回）'), h('span', {}, fmtSize(rep.file.wal))]),
+          h('div', { className: 'co-kv' }, [h('span', {}, '空闲页（删了没归还）'), h('span', {}, fmtSize(rep.freelist))]),
+          rep.path ? h('div', { className: 'co-muted', style: { fontSize: 11, wordBreak: 'break-all' } }, rep.path) : null,
+        ].filter(Boolean)),
+        h('div', { className: 'co-card', key: 'c2' }, [
+          h('div', { className: 'co-title' }, '都占在哪'),
+          h('div', { className: 'co-list' }, (rep.groups || []).map((g) => h('div', { key: g.id, className: 'co-item' }, [
+            h('div', { className: 'co-meta' }, [
+              h('span', {}, g.label),
+              h('span', { style: { marginLeft: 'auto' } }, fmtSize(g.bytes)),
+            ]),
+            h('div', { style: { height: 6, borderRadius: 999, background: 'var(--dsw-alias-bg-layer-2)', overflow: 'hidden' } },
+              h('div', { style: { width: Math.max(2, Math.round(g.bytes / total * 100)) + '%', height: '100%', background: 'var(--dsw-alias-brand-primary)' } })),
+          ]))),
+        ]),
+        h('div', { className: 'co-card', key: 'c3' }, [
+          h('div', { className: 'co-title' }, '条目数'),
+          h('div', { className: 'co-grid' }, [
+            ['会话', c.sessions], ['归档消息', c.messages], ['压缩块', c.blocks],
+            ['心声', c.hearts], ['记忆', c.memories], ['惦记', c.followups],
+          ].map(([k, v]) => h('div', { key: k, className: 'co-item' }, [
+            h('div', { className: 'co-muted', style: { fontSize: 11 } }, k),
+            h('div', { style: { fontSize: 16 } }, String(v == null ? 0 : v)),
+          ]))),
+        ]),
+        h(Row, { key: 'r' }, [
+          h('button', { className: 'co-btn co-btn-primary', disabled: busy, onClick: () => tidy().catch(() => {}) }, busy ? '整理中…' : '整理数据库'),
+          notice ? h('span', { className: 'co-muted' }, notice) : null,
+        ].filter(Boolean)),
+      ])
+    }
+
+    /** 聊天记录：像微信那样按会话列出来，逐条删或全清。 */
+    function ChatRecords() {
+      const [data, setData] = useState(null)
+      const [busy, setBusy] = useState(false)
+      const [notice, setNotice] = useState('')
+      const [pending, setPending] = useState('')
+      const [confirmAll, setConfirmAll] = useState(false)
+      const [withHeart, setWithHeart] = useState(false)
+      const load = useCallback(async () => { setData(await api('chatSessions')) }, [])
+      useEffect(() => { load().catch(() => {}) }, [load])
+      const purge = async (args, label) => {
+        if (busy) return
+        setBusy(true)
+        try {
+          const r = await api('chatPurge', Object.assign({}, args, { heart: withHeart }), 'POST')
+          const d = r.deleted || {}
+          setNotice(label + '：删了 ' + (d.messages || 0) + ' 条消息、' + (d.blocks || 0) + ' 个压缩块'
+            + (d.hearts ? '、' + d.hearts + ' 条心声' : '') + '，释放 ' + fmtSize(r.freed))
+          setPending(''); setConfirmAll(false); load()
+        } catch (e) { setNotice('删除失败：' + (e.message || e)) } finally { setBusy(false) }
+      }
+      if (!data) return h('div', { className: 'co-muted' }, '正在统计…')
+      const list = data.sessions || []
+      return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, [
+        h('div', { className: 'co-card', key: 'head' }, [
+          h('div', { className: 'co-title' }, '聊天记录 · ' + list.length + ' 个会话，内容 ' + fmtSize(data.bytes)),
+          h('div', { className: 'co-muted' }, '删的是压缩后的原文归档（含全文检索索引）。记忆、人格、风格卡、惦记一律不动；心声默认留着，勾上才一起删。删完自动整理库文件，把空间还给系统。'),
+          h(Row, { key: 'opt' }, [
+            h(Switch, { on: withHeart, onChange: setWithHeart, title: '连心声一起删' }),
+            h('span', { className: 'co-muted' }, withHeart ? '连心声一起删（' + (data.hearts || 0) + ' 条）' : '只删聊天归档，心声保留'),
+          ]),
+          h(Row, { key: 'all' }, [
+            confirmAll
+              ? h('button', { className: 'co-btn co-btn-primary', disabled: busy, onClick: () => purge({ all: true }, '全部清空').catch(() => {}) }, busy ? '正在删…' : '确认清空全部')
+              : h('button', { className: 'co-btn', disabled: busy || list.length === 0, onClick: () => setConfirmAll(true) }, '清空全部聊天记录'),
+            confirmAll ? h('button', { className: 'co-btn', onClick: () => setConfirmAll(false) }, '再想想') : null,
+            notice ? h('span', { className: 'co-muted' }, notice) : null,
+          ].filter(Boolean)),
+        ]),
+        h('div', { className: 'co-list', key: 'list' }, list.length === 0
+          ? [h('div', { key: 'e', className: 'co-empty' }, '还没有聊天归档')]
+          : list.map((s) => h('div', { key: s.sessionId, className: 'co-item' }, [
+            h('div', {}, s.name),
+            h('div', { className: 'co-meta' }, [
+              h('span', { className: 'co-pill' }, s.messages + ' 条'),
+              s.blocks ? h('span', { className: 'co-pill' }, s.blocks + ' 块') : null,
+              s.hearts ? h('span', { className: 'co-pill' }, s.hearts + ' 心声') : null,
+              h('span', {}, fmtSize(s.bytes)),
+              h('span', {}, fmtTime(s.lastAt)),
+              pending === s.sessionId
+                ? h('button', { className: 'co-btn co-btn-primary', style: { padding: '1px 8px', fontSize: 11 }, disabled: busy, onClick: () => purge({ sessionId: s.sessionId }, '已删除这个会话').catch(() => {}) }, '确认删除')
+                : h('button', { className: 'co-btn', style: { padding: '1px 8px', fontSize: 11 }, onClick: () => setPending(s.sessionId) }, '删除'),
+            ].filter(Boolean)),
+          ]))),
+      ])
     }
 
     function Panel() {
@@ -701,6 +949,9 @@ window.__ModuleLoader__.load({
         learning: h(Learn, { key: 'ln' }),
         compression: h(Compression, { key: 'cp', data, refresh: load }),
         persona: h(Persona, { key: 'pe', data, refresh: load }),
+        collab: h(Collab, { key: 'cb' }),
+        storage: h(Storage, { key: 'sg' }),
+        chat: h(ChatRecords, { key: 'cr' }),
       }[cur]
 
       return h('div', { className: 'co-panel' }, [

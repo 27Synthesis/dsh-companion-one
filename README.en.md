@@ -17,7 +17,7 @@ No second plugin, no native module to compile, and no extra model calls by defau
 [![License: MIT](https://img.shields.io/badge/License-MIT-4c9f70?style=flat-square)](LICENSE)
 [![Node ≥ 22.13](https://img.shields.io/badge/node-%E2%89%A5%2022.13-339933?style=flat-square&logo=node.js&logoColor=white)](#requirements)
 [![DSH plugin](https://img.shields.io/badge/DSH-plugin-1d6fa5?style=flat-square)](#install)
-[![Tests](https://img.shields.io/badge/tests-11%20suites-brightgreen?style=flat-square)](#tests)
+[![Tests](https://img.shields.io/badge/tests-21%20suites-brightgreen?style=flat-square)](#tests)
 [![token-frugal](https://img.shields.io/badge/token-frugal-6c5ce7?style=flat-square)](https://github.com/27Synthesis/dsh-companion-one#where-the-tokens-go-and-how-they-are-saved)
 [![node:sqlite · FTS5](https://img.shields.io/badge/storage-node%3Asqlite%20%C2%B7%20FTS5-003b57?style=flat-square&logo=sqlite&logoColor=white)](#data--privacy)
 
@@ -51,7 +51,7 @@ The usual fix is a stack of plugins — one for compression, one for memory, one
 | 🗣️ | **Communication style learning** | learns sentence length, catchphrases, punctuation, emoji — the shape, never the content |
 | 💬 | **Mood + heart voice** | two-factor mood (valence / energy); one first-person line per turn, display only, never written back |
 | 🖥️ | **Panel + tools** | 8-tab settings panel, 13 tools, 8 dshGo native views, HTTP API |
-| 🧩 | **11 test suites** | compression, memory, companionship, style, persona, mood, learning, import, conflict, regression |
+| 🧩 | **21 test suites** | compression, memory, companionship, style, persona, mood, learning, import, conflict, collaboration, regression |
 | 🛡️ | **Safety details** | read-only import, secret filtering, CSRF-safe write API, graceful surrender on tool-name conflicts |
 
 ## ⚡ Where the tokens go (and how they are saved)
@@ -211,9 +211,16 @@ The fishtalk checks are ported into the plugin (MIT), with no online dependency:
 
 ### 10) Panel, native views, API
 
-- **8 tabs** — Overview / Memory / Settings / Learning / Compression / Follow-ups / Style / Persona.
+- **10 tabs** — Overview / Memory / Settings / Learning / Compression / Follow-ups / Style / Persona / Collaboration / Storage. The Storage tab splits the database into file / WAL / free pages and draws a share bar per content group (chat archive, compression blocks, seven memory layers, heart voices, persona, session state, follow-ups, style cards); its chat-log sub-tab lists sessions with message, block and heart-voice counts plus the last time, and can delete one session or clear them all — followed by an automatic checkpoint + VACUUM that reports the space reclaimed. Memory, persona and settings are never touched.
 - **dshGo native** — a “companion snapshot” panel and a `moodstrip⟫ pill above the composer, showing mood, pressure and the latest heart voice.
 - **HTTP API** — `/companion-one/api⟫ (prefix route sharing `runOp⟫ from `lib/api.js⟫). Writes accept only `POST⟫ + `application/json⟫; GET returns 405, text/plain returns 415, keeping cross-site pages from talking to the local port.
+
+<div align="center">
+  <img src="docs/screenshots/storage.jpg" alt="Storage tab: file / WAL / free pages and the share of each content group" width="280" />
+  <img src="docs/screenshots/storage-chat.jpg" alt="Chat log sub-tab: sessions with counts and size, delete one or clear all" width="280" />
+  <br/>
+  <sub>Real device · Storage tab (usage / chat log)</sub>
+</div>
 
 ## 🏗 Architecture
 
@@ -402,7 +409,7 @@ companion-one/
 │   ├── import.js     # memory import
 │   └── api.js        # op dispatcher shared by panel and tools
 ├── locale/           # Chinese and English metadata
-├── test/             # 11 test suites
+├── test/             # 21 test suites
 ├── docs/cover.svg    # social preview / README hero
 ├── docs/banner.svg
 ├── icon.svg

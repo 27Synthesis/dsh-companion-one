@@ -25,6 +25,7 @@ import { appraise, valvePrompt, endOfTurn, readValves, currentNarrative, listNar
 import { userState, personaReaction, addHeartVoice, latestHeartVoice, fallbackHeartVoice, angerOf, angerPrompt, reviewHeart } from './lib/mood.js'
 import { expressionStage, checkText, violationHint } from './lib/persona.js'
 import { heartBudget, heartStyleHint } from './lib/style.js'
+import { fishBlock, fishStatus } from './lib/bridge.js'
 import { runOp, settingsSnapshot, setSetting } from './lib/api.js'
 
 export const name = 'companion-one'
@@ -278,6 +279,15 @@ export function apply(ctx, config) {
         const rage = angerPrompt(userText)
         if (rage) parts.push(rage)
       }
+    }
+
+    // 4.6) 大肥鱼那边（只读）：便签 / 约 / 她那边的记忆 / 她最近说的。
+    // 只在新发言时带一次；读不到就什么都不加，开关关掉就整段不出现。
+    if (enabled.bridge && realUser && cfg.fishBridge !== false) {
+      try {
+        const fb = fishBlock({ session, query: userText, budget: cfg.fishBudget || 110 })
+        if (fb) parts.push(fb)
+      } catch (err) { log(ctx, 'fish bridge failed', err) }
     }
 
     // 5)+6)+⑥ 稳定层（风格 / 四阀门 / 表达规则）：一轮只注入一次，并合并成一段。
@@ -694,17 +704,27 @@ export function apply(ctx, config) {
         // 写操作只收 POST：GET 可能是 <img>/<link> 或别的页面顺手带的请求，
         // 让它有机会删记忆、改设置、清危机状态太危险。
         const WRITE_OPS = new Set([
-          'setSetting', 'memoryAdd', 'memoryUpdate', 'memoryDelete', 'memoryInvalidate', 'memoryImportRun',
+          'setSetting', 'memoryAdd', 'memoryUpdate', 'memoryDelete', 'memoryInvalidate', 'memoryCleanup', 'memoryImportRun',
           'followupAdd', 'followupDone', 'followupSilence', 'followupAsk',
           'styleToggle', 'styleDelete', 'styleLearn',
           'personaFreeze', 'personaPromote', 'personaRollback',
-          'setScope', 'ftFeed', 'ftLearn', 'ftCancel', 'crisisClear',
+          'setScope', 'ftFeed', 'ftLearn', 'ftCancel', 'crisisClear', 'chatPurge', 'vacuum',
         ])
         try {
           // 同源校验：挡掉跨站页面/跨站请求。本机其它进程仍可能伪造请求头，
           // 真要更严需要给路由加 token（见交接文档「风险」）。
           const host = String((req.headers && req.headers.host) || '')
           const origin = String((req.headers && req.headers.origin) || '')
+          // DNS rebinding：攻击域解析到 127.0.0.1 后，Host 和 Origin 都是那个域名，
+          // 只比 origin 与 host 相等是拦不住的。所以这里只认回环地址和字面 IP，
+          // 域名一律拒绝（本机面板本来就用 127.0.0.1:port 打开）。
+          if (host) {
+            const hostname = host.replace(/:\d+$/, '').toLowerCase().replace(/^\[(.*)\]$/, '$1')
+            const isLoop = hostname === 'localhost' || hostname === '::1' || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)
+            const isIp = /^\d{1,3}(\.\d{1,3}){3}$/.test(hostname) ||
+              (hostname.includes(':') && /^[0-9a-f:.]+$/.test(hostname))
+            if (!isLoop && !isIp) { send(403, { ok: false, error: 'bad_host' }); return }
+          }
           if (origin && !origin.endsWith('://' + host)) { send(403, { ok: false, error: 'cross_origin' }); return }
           if (String((req.headers && req.headers['sec-fetch-site']) || '') === 'cross-site') { send(403, { ok: false, error: 'cross_site' }); return }
           const url = new URL(req.url || '/', 'http://127.0.0.1')
@@ -760,6 +780,9 @@ export function apply(ctx, config) {
       } catch {}
       let blocks = 0
       try { blocks = db.prepare('select count(*) c from compressed_blocks where status = \'committed\'').get().c } catch {}
+      // 大肥鱼那边（只读）：那边醒着没有、几张便签、几条约、几条她自己的记忆
+      let fish = { on: false, line: '那边还没醒过' }
+      try { fish = fishStatus({ session: sessionId ? { id: sessionId } : null }) } catch {}
       const pressure = Math.max(0, Math.min(100, Math.round(Number(row?.pressure || 0))))
       const mood = row?.mood || (crisis.level >= 3 ? '担心' : '安心')
       const moodWhy = row?.mood_why || (crisis.level >= 3 ? '主人之前说过那样的话，我还没完全放下心。' : '还没听到主人说话，我在旁边等着。')
@@ -797,6 +820,8 @@ export function apply(ctx, config) {
         follow,
         memCount: String(memCount),
         blocks: String(blocks),
+        fish: String(fish.line || ''),
+        fishOn: !!fish.on,
       }
     }
 
@@ -825,6 +850,7 @@ export function apply(ctx, config) {
             items: [
               ['惦记', { $: 'data.follow' }],
               ['记忆', { $: 'data.memCount' }],
+              ['大肥鱼', { $: 'data.fish' }],
               ['压缩块', { $: 'data.blocks' }],
               ['会话', { $: 'data.moodHint' }],
             ],
