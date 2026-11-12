@@ -216,11 +216,20 @@ The fishtalk checks are ported into the plugin (MIT), with no online dependency:
 - **HTTP API** — `/companion-one/api⟫ (prefix route sharing `runOp⟫ from `lib/api.js⟫). Writes accept only `POST⟫ + `application/json⟫; GET returns 405, text/plain returns 415, keeping cross-site pages from talking to the local port.
 
 <div align="center">
-  <img src="docs/screenshots/storage.jpg" alt="Storage tab: file / WAL / free pages and the share of each content group" width="280" />
-  <img src="docs/screenshots/storage-chat.jpg" alt="Chat log sub-tab: sessions with counts and size, delete one or clear all" width="280" />
+  <img src="docs/screenshots/storage.jpg" alt="Storage tab: file / WAL / free pages plus the share of each content group" width="280" />
   <br/>
-  <sub>Real device · Storage tab (usage / chat log)</sub>
+  <sub>Real device 1 · Storage: see how much is used and where it went</sub>
 </div>
+
+**This is the WeChat “Storage” screen, for a companion.** Memories, compression blocks and heart voices all live in one database, and it grows quietly for as long as you keep talking. The tab splits usage three ways — the file itself, the WAL that has not been written back, and free pages that were deleted but never returned — then breaks the total down by content: chat archive, compression summaries, the seven memory layers, heart voices, persona, session state, follow-ups, style cards, each with its own share bar, plus counts for sessions, archived messages, blocks, heart voices and memories.
+
+<div align="center">
+  <img src="docs/screenshots/storage-chat.jpg" alt="Chat log: sessions with message, block and heart-voice counts plus size; delete one or clear all" width="280" />
+  <br/>
+  <sub>Real device 2 · Chat log: clean up session by session</sub>
+</div>
+
+**This is WeChat’s “Chat history” manager.** One row per session, titled with the first line the owner said in that conversation, followed by message count, block count, heart-voice count, size and the last time. Delete one, or clear them all — with two taps of confirmation. Only the compressed raw archive and its full-text index go away; memories, persona, style cards and follow-ups stay untouched, and heart voices are kept unless you flip the switch. Afterwards it runs checkpoint + VACUUM so the freed pages really return to the system, and reports how much was reclaimed.
 
 ## 🏗 Architecture
 
